@@ -58,13 +58,6 @@ const DATE_RANGES = [
   { label: '30 Days', days: 30 },
 ]
 
-const PRESETS: { label: string; coords: [number, number] }[] = [
-  { label: 'Oklahoma City, OK', coords: [35.4676, -97.5164]  },
-  { label: 'Amarillo, TX',      coords: [35.2220, -101.8313] },
-  { label: 'Wichita, KS',       coords: [37.6872, -97.3301]  },
-  { label: 'Dallas, TX',        coords: [32.7767, -96.7970]  },
-  { label: 'Denver, CO',        coords: [39.7392, -104.9903] },
-]
 
 interface HailProps {
   magnitude: number
@@ -102,7 +95,7 @@ function hailIntensity(size: number) {
 function MapController({ center }: { center: [number, number] | null }) {
   const map = useMap()
   useEffect(() => {
-    if (center) map.flyTo(center, 10, { duration: 1.5 })
+    if (center) map.flyTo(center, 17, { duration: 1.5 })
   }, [center, map])
   return null
 }
@@ -147,6 +140,8 @@ export default function HailMap() {
   const [mapCenter, setMapCenter]       = useState<[number, number] | null>(null)
   const [searchQuery, setSearchQuery]   = useState('')
   const [searching, setSearching]       = useState(false)
+  const [suggestions, setSuggestions]   = useState<{ place_id: number; display_name: string; lat: string; lon: string }[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const [tileMode, setTileMode]         = useState<'dark' | 'satellite'>('dark')
   const [minSize, setMinSize]           = useState(1.0)
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
@@ -177,12 +172,32 @@ export default function HailMap() {
     return () => { cancelled = true }
   }, [rangeDays])
 
+  // Debounced autocomplete
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (q.length < 2) { setSuggestions([]); return }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${NOMINATIM}/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=us`,
+          { headers: { 'Accept-Language': 'en' } }
+        )
+        const data = await res.json()
+        setSuggestions(data)
+        setShowSuggestions(true)
+      } catch { /* ignore */ }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return
     setSearching(true)
+    setSuggestions([])
+    setShowSuggestions(false)
     try {
       const res     = await fetch(
-        `${NOMINATIM}/search?format=json&q=${encodeURIComponent(searchQuery)}`,
+        `${NOMINATIM}/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=us`,
         { headers: { 'Accept-Language': 'en' } }
       )
       const results = await res.json()
@@ -192,6 +207,13 @@ export default function HailMap() {
       setSearching(false)
     }
   }, [searchQuery])
+
+  const handleSelectSuggestion = (s: { lat: string; lon: string; display_name: string }) => {
+    setMapCenter([parseFloat(s.lat), parseFloat(s.lon)])
+    setSearchQuery(s.display_name.split(',')[0])
+    setSuggestions([])
+    setShowSuggestions(false)
+  }
 
   const pool       = reports.filter(f => normalizeMagnitude(f.properties.magnitude ?? 0) >= minSize)
   const heatPoints = pool.map<[number, number, number]>(f => {
@@ -216,14 +238,37 @@ export default function HailMap() {
           {error              && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {error}</span>}
         </div>
         <div className={styles.searchRow}>
-          <input
-            className={styles.searchInput}
-            type="text"
-            placeholder="Search address or ZIP…"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSearch()}
-          />
+          <div className={styles.searchWrapper}>
+            <input
+              className={styles.searchInput}
+              type="text"
+              placeholder="Search address or ZIP…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className={styles.suggestions}>
+                {suggestions.map(s => {
+                  const parts = s.display_name.split(',')
+                  return (
+                    <button
+                      key={s.place_id}
+                      className={styles.suggestion}
+                      onMouseDown={() => handleSelectSuggestion(s)}
+                    >
+                      <span className={styles.suggestionPrimary}>{parts[0]}</span>
+                      {parts.length > 1 && (
+                        <span className={styles.suggestionSub}>{parts.slice(1, 3).join(',').trim()}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
           <button className={styles.searchBtn} onClick={handleSearch} disabled={searching}>
             {searching ? '…' : 'Go'}
           </button>
@@ -270,15 +315,6 @@ export default function HailMap() {
         </SidebarSection>
 
         <SidebarSection delay={0.22}>
-          <h3 className={styles.sectionLabel}>Jump To</h3>
-          {PRESETS.map(p => (
-            <button key={p.label} className={styles.presetBtn} onClick={() => setMapCenter(p.coords)}>
-              {p.label}
-            </button>
-          ))}
-        </SidebarSection>
-
-        <SidebarSection delay={0.29}>
           <h3 className={styles.sectionLabel}>Reports</h3>
           <div className={styles.metricBig}>
             <span className={styles.metricNumber}>{loading ? '—' : pool.length}</span>
@@ -286,23 +322,18 @@ export default function HailMap() {
           </div>
         </SidebarSection>
 
-        <AnimatePresence>
-          {selectedAddress && (
-            <motion.div
-              key="selected"
-              className={styles.sidebarSection}
-              initial={{ opacity: 0, y: 12, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
-              exit={{    opacity: 0, y: -8,  filter: 'blur(4px)' }}
-              transition={{ duration: 0.45, ease: EASE }}
-            >
-              <h3 className={styles.sectionLabel}>Selected Property</h3>
+        <SidebarSection delay={0.36}>
+          <h3 className={styles.sectionLabel}>Selected Property</h3>
+          {selectedAddress ? (
+            <>
               <p className={styles.addrLine1}>{selectedAddress.line1}</p>
               <p className={styles.addrLine2}>{selectedAddress.line2}</p>
               <button className={styles.addBtn}>+ Add to List</button>
-            </motion.div>
+            </>
+          ) : (
+            <p className={styles.noSelection}>Click a location on the map</p>
           )}
-        </AnimatePresence>
+        </SidebarSection>
 
       </div>
 
@@ -318,7 +349,7 @@ export default function HailMap() {
           center={[37.5, -96]}
           zoom={5}
           minZoom={4}
-          maxZoom={18}
+          maxZoom={20}
           maxBounds={US_BOUNDS}
           maxBoundsViscosity={1.0}
           zoomControl={false}
@@ -328,13 +359,15 @@ export default function HailMap() {
             url={TILES[tileMode].url}
             attribution={TILES[tileMode].attribution}
             subdomains={TILES[tileMode].subdomains}
-            maxZoom={18}
+            maxNativeZoom={19}
+            maxZoom={20}
           />
           {tileMode === 'satellite' && (
             <TileLayer
               url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
               attribution=""
-              maxZoom={18}
+              maxNativeZoom={19}
+              maxZoom={20}
             />
           )}
 

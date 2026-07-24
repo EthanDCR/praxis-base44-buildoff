@@ -31,9 +31,10 @@
 }
 
 .brandName {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-primary);
   line-height: 1;
@@ -46,47 +47,48 @@
   text-transform: uppercase;
   color: var(--text-muted);
   padding-left: 1px;
-  padding-top: 1px;
   align-self: flex-end;
   padding-bottom: 2px;
 }
 
-/* ── Nav links ──────────────────────────────── */
+/* ── Nav links — plain text, no button chrome ── */
 .links {
   list-style: none;
   display: flex;
+  align-items: center;
   gap: 2px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-md);
-  padding: 4px;
 }
 
 .link {
   display: block;
-  padding: 6px 18px;
-  border-radius: 7px;
+  padding: 8px 16px;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-muted);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   white-space: nowrap;
-  transition: color 0.2s, background-color 0.2s;
+  transition: color 0.2s;
+  position: relative;
 }
 
 .link:hover {
   color: var(--text-secondary);
-  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .active {
   color: var(--text-primary);
-  background: linear-gradient(135deg, rgba(192, 0, 33, 0.25), rgba(160, 0, 28, 0.15));
-  border: 1px solid rgba(192, 0, 33, 0.3);
-  box-shadow: 0 0 14px rgba(192, 0, 33, 0.15), inset 0 1px 0 rgba(255,255,255,0.05);
+  font-weight: 600;
 }
 
-.active:hover {
-  color: var(--text-primary);
-  background: linear-gradient(135deg, rgba(192, 0, 33, 0.35), rgba(160, 0, 28, 0.25));
+/* thin red line under the active item */
+.active::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 16px;
+  right: 16px;
+  height: 1.5px;
+  background: var(--accent);
+  border-radius: 1px;
+  opacity: 0.8;
 }

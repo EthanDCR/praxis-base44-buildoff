@@ -29,7 +29,10 @@
   --radius-md: 10px;
   --radius-lg: 16px;
 
-  font-family: 'Inter', system-ui, sans-serif;
+  --font-ui:      'Space Grotesk', system-ui, sans-serif;
+  --font-display: 'Syne', system-ui, sans-serif;
+
+  font-family: var(--font-ui);
   font-size: 16px;
   color: var(--text-primary);
   background-color: var(--bg);
