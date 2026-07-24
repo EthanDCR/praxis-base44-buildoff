@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MapContainer, TileLayer, useMap } from 'react-leaflet'
-import HeatmapLayer from '../../components/HeatmapLayer/HeatmapLayer'
+import { MapContainer, TileLayer, Circle, Tooltip, useMap, useMapEvent } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
+import HeatmapLayer from '../../components/HeatmapLayer/HeatmapLayer'
 import 'leaflet/dist/leaflet.css'
 import styles from './HailMap.module.css'
 
-// Restrict pan/zoom to continental US + Alaska/Hawaii buffer
 const US_BOUNDS: LatLngBoundsExpression = [[15, -135], [58, -55]]
 
 const TILES = {
@@ -23,35 +22,30 @@ const TILES = {
 
 // ---------------------------------------------------------------------------
 // Iowa Environmental Mesonet — Local Storm Reports (hail only)
-// Docs: https://mesonet.agron.iastate.edu/geojson/lsr.php
-//
-// Query params:
-//   sts  — start time UTC, format YYYYMMDDHHmm
-//   ets  — end time UTC, format YYYYMMDDHHmm
-//   type — H = hail only
-//
-// Feature properties:
-//   magnitude — hail diameter in inches (float)
-//   city      — nearest city/location name
-//   county    — county name
-//   state     — two-letter state abbreviation
-//   valid     — ISO-8601 UTC timestamp of the event
-//   remark    — storm spotter free-text notes
+// Properties: magnitude (inches), city, county, state, valid (ISO-8601), remark
 // Geometry: GeoJSON Point [longitude, latitude]
 // ---------------------------------------------------------------------------
-const IEM_BASE = 'https://mesonet.agron.iastate.edu/geojson/lsr.php'
-const NOMINATIM = 'https://nominatim.openstreetmap.org/search?format=json&q='
+const IEM_BASE  = 'https://mesonet.agron.iastate.edu/geojson/lsr.php'
+const NOMINATIM = 'https://nominatim.openstreetmap.org'
 
-// Format a Date to YYYYMMDDHHmm for IEM API
 function iemDate(d: Date) {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}`
 }
 
 function buildUrl(days: number) {
-  const now = new Date()
+  const now   = new Date()
   const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
   return `${IEM_BASE}?sts=${iemDate(start)}&ets=${iemDate(now)}&type=H`
+}
+
+function formatDate(valid: string) {
+  try {
+    return new Date(valid).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+    })
+  } catch { return valid }
 }
 
 const DATE_RANGES = [
@@ -84,13 +78,19 @@ interface HailFeature {
   properties: HailProps
 }
 
-// Normalize magnitude to 0–1 intensity for the heatmap
-// 0.75" = low end (min size), 3.0"+ = max intensity
+interface SelectedAddress {
+  display: string
+  line1: string
+  line2: string
+  lat: number
+  lng: number
+}
+
 function hailIntensity(size: number) {
   return Math.min((size - 0.75) / 2.25, 1.0)
 }
 
-
+// Flies map to a new center
 function MapController({ center }: { center: [number, number] | null }) {
   const map = useMap()
   useEffect(() => {
@@ -99,34 +99,50 @@ function MapController({ center }: { center: [number, number] | null }) {
   return null
 }
 
-export default function HailMap() {
-  const [reports, setReports]       = useState<HailFeature[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState<string | null>(null)
-  const [rangeDays, setRangeDays]   = useState(7)
-  const [mapCenter, setMapCenter]   = useState<[number, number] | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searching, setSearching]   = useState(false)
-  const [tileMode, setTileMode]     = useState<'dark' | 'satellite'>('dark')
-  const [minSize, setMinSize]       = useState(1.0)
+// Reverse-geocodes every map click via Nominatim and calls onAddress
+function MapClickHandler({ onAddress }: { onAddress: (addr: SelectedAddress) => void }) {
+  useMapEvent('click', async (e) => {
+    const { lat, lng } = e.latlng
+    try {
+      const res  = await fetch(
+        `${NOMINATIM}/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      )
+      const data = await res.json()
+      const a    = data.address ?? {}
+      const line1 = [a.house_number, a.road].filter(Boolean).join(' ') || data.display_name?.split(',')[0]
+      const line2 = [a.city || a.town || a.village, a.state].filter(Boolean).join(', ')
+      onAddress({ display: data.display_name, line1, line2, lat, lng })
+    } catch { /* silently ignore */ }
+  })
+  return null
+}
 
-  // Fetch hail reports from IEM whenever the date range changes
+export default function HailMap() {
+  const [reports, setReports]           = useState<HailFeature[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState<string | null>(null)
+  const [rangeDays, setRangeDays]       = useState(7)
+  const [mapCenter, setMapCenter]       = useState<[number, number] | null>(null)
+  const [searchQuery, setSearchQuery]   = useState('')
+  const [searching, setSearching]       = useState(false)
+  const [tileMode, setTileMode]         = useState<'dark' | 'satellite'>('dark')
+  const [minSize, setMinSize]           = useState(1.0)
+  const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
+
   useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(buildUrl(rangeDays))
+        const res      = await fetch(buildUrl(rangeDays))
         if (!res.ok) throw new Error(`IEM responded with ${res.status}`)
-        const geojson = await res.json()
-        const features: HailFeature[] = (geojson.features ?? []).filter(
+        const geojson  = await res.json()
+        const features = (geojson.features ?? []).filter(
           (f: HailFeature) => f.geometry?.coordinates?.length === 2
         )
-        if (!cancelled) {
-          console.log(`[IEM] loaded ${features.length} hail reports (last ${rangeDays}d)`)
-          setReports(features)
-        }
+        if (!cancelled) setReports(features)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load data')
       } finally {
@@ -141,7 +157,7 @@ export default function HailMap() {
     if (!searchQuery.trim()) return
     setSearching(true)
     try {
-      const res = await fetch(`${NOMINATIM}${encodeURIComponent(searchQuery)}`, {
+      const res     = await fetch(`${NOMINATIM}/search?format=json&q=${encodeURIComponent(searchQuery)}`, {
         headers: { 'Accept-Language': 'en' },
       })
       const results = await res.json()
@@ -152,9 +168,8 @@ export default function HailMap() {
     }
   }, [searchQuery])
 
-  const pool = reports.filter(f => (f.properties.magnitude ?? 0) >= minSize)
-
-  const heatPoints: [number, number, number][] = pool.map(f => {
+  const pool       = reports.filter(f => (f.properties.magnitude ?? 0) >= minSize)
+  const heatPoints = pool.map<[number, number, number]>(f => {
     const [lng, lat] = f.geometry.coordinates
     return [lat, lng, hailIntensity(f.properties.magnitude ?? 0)]
   })
@@ -162,13 +177,13 @@ export default function HailMap() {
   return (
     <div className={styles.page}>
 
-      {/* ── Top bar ────────────────────────────────────────────── */}
+      {/* ── Top bar ────────────────────────────────────────── */}
       <div className={styles.topBar}>
         <div className={styles.topBarLeft}>
           <span className={styles.pageTitle}>Storm Map</span>
-          {loading   && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
+          {loading            && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
           {!loading && !error && <span className={`${styles.badge} ${styles.badgeLive}`}>● Live</span>}
-          {error     && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {error}</span>}
+          {error              && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {error}</span>}
         </div>
         <div className={styles.searchRow}>
           <input
@@ -185,14 +200,13 @@ export default function HailMap() {
           <button
             className={`${styles.tileToggle} ${tileMode === 'satellite' ? styles.tileToggleActive : ''}`}
             onClick={() => setTileMode(m => m === 'dark' ? 'satellite' : 'dark')}
-            title="Toggle satellite view"
           >
             {tileMode === 'dark' ? '🛰 Satellite' : '🗺 Dark'}
           </button>
         </div>
       </div>
 
-      {/* ── Sidebar ────────────────────────────────────────────── */}
+      {/* ── Sidebar ────────────────────────────────────────── */}
       <div className={styles.sidebar}>
 
         <div className={styles.sidebarSection}>
@@ -225,7 +239,6 @@ export default function HailMap() {
           </div>
         </div>
 
-
         <div className={styles.sidebarSection}>
           <h3 className={styles.sectionLabel}>Jump To</h3>
           {PRESETS.map(p => (
@@ -243,38 +256,71 @@ export default function HailMap() {
           </div>
         </div>
 
+        {selectedAddress && (
+          <div className={styles.sidebarSection}>
+            <h3 className={styles.sectionLabel}>Selected Property</h3>
+            <p className={styles.addrLine1}>{selectedAddress.line1}</p>
+            <p className={styles.addrLine2}>{selectedAddress.line2}</p>
+            <button className={styles.addBtn}>+ Add to List</button>
+          </div>
+        )}
 
       </div>
 
-      {/* ── Map card ───────────────────────────────────────────── */}
+      {/* ── Map card ───────────────────────────────────────── */}
       <div className={styles.mapWrapper}>
-      <MapContainer
-        className={styles.map}
-        center={[37.5, -96]}
-        zoom={5}
-        minZoom={4}
-        maxZoom={18}
-        maxBounds={US_BOUNDS}
-        maxBoundsViscosity={1.0}
-        zoomControl={false}
-      >
-        <TileLayer
-          key={tileMode}
-          url={TILES[tileMode].url}
-          attribution={TILES[tileMode].attribution}
-          subdomains={TILES[tileMode].subdomains}
+        <MapContainer
+          className={styles.map}
+          center={[37.5, -96]}
+          zoom={5}
+          minZoom={4}
           maxZoom={18}
-        />
-        {tileMode === 'satellite' && (
+          maxBounds={US_BOUNDS}
+          maxBoundsViscosity={1.0}
+          zoomControl={false}
+        >
           <TileLayer
-            url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-            attribution=""
+            key={tileMode}
+            url={TILES[tileMode].url}
+            attribution={TILES[tileMode].attribution}
+            subdomains={TILES[tileMode].subdomains}
             maxZoom={18}
           />
-        )}
-        <MapController center={mapCenter} />
-        <HeatmapLayer points={heatPoints} />
-      </MapContainer>
+          {tileMode === 'satellite' && (
+            <TileLayer
+              url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+              attribution=""
+              maxZoom={18}
+            />
+          )}
+
+          <MapController center={mapCenter} />
+          <MapClickHandler onAddress={setSelectedAddress} />
+          <HeatmapLayer points={heatPoints} />
+
+          {/* Invisible geographic circles for hover tooltips — match heatmap radius */}
+          {pool.map((f, i) => {
+            const [lng, lat] = f.geometry.coordinates
+            const { magnitude, city, county, state, valid, remark } = f.properties
+            const label = [city, county, state].filter(Boolean).join(', ')
+            return (
+              <Circle
+                key={i}
+                center={[lat, lng]}
+                radius={5000}
+                pathOptions={{ fillOpacity: 0.01, opacity: 0, weight: 0, interactive: true }}
+              >
+                <Tooltip sticky className={styles.hailTooltip}>
+                  <span className={styles.ttDate}>{formatDate(valid)}</span>
+                  <span className={styles.ttSize}>{magnitude}"</span>
+                  {label && <span className={styles.ttLocation}>{label}</span>}
+                  {remark && <span className={styles.ttRemark}>{remark}</span>}
+                </Tooltip>
+              </Circle>
+            )
+          })}
+
+        </MapContainer>
       </div>
 
     </div>
