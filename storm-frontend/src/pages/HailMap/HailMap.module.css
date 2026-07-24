@@ -1,4 +1,4 @@
-/* Page fills the space below the navbar exactly — no overflow */
+/* Page fills the space below the navbar exactly */
 .page {
   height: calc(100vh - var(--nav-height));
   display: grid;
@@ -16,10 +16,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 10px 16px;
   background: var(--surface);
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 rgba(64, 123, 167, 0.08);
 }
 
 .topBarLeft {
@@ -30,36 +31,38 @@
 }
 
 .pageTitle {
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: 0.01em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .badge {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  padding: 3px 8px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  padding: 3px 9px;
   border-radius: 100px;
+  text-transform: uppercase;
 }
 
 .badgeLive {
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(34, 197, 94, 0.1);
   color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.28);
+  border: 1px solid rgba(34, 197, 94, 0.22);
 }
 
 .badgeLoading {
-  background: rgba(64, 123, 167, 0.12);
+  background: rgba(64, 123, 167, 0.1);
   color: var(--text-secondary);
   border: 1px solid var(--surface-border);
 }
 
 .badgeError {
-  background: rgba(192, 0, 33, 0.12);
+  background: rgba(192, 0, 33, 0.1);
   color: #ff6b6b;
-  border: 1px solid rgba(192, 0, 33, 0.28);
+  border: 1px solid rgba(192, 0, 33, 0.22);
 }
 
 .searchRow {
@@ -71,7 +74,7 @@
 
 .searchInput {
   flex: 1;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-sm);
   padding: 7px 12px;
@@ -83,7 +86,7 @@
 }
 
 .searchInput::placeholder { color: var(--text-muted); }
-.searchInput:focus { border-color: var(--surface-border-strong); }
+.searchInput:focus        { border-color: var(--surface-border-strong); }
 
 .searchBtn {
   background: linear-gradient(135deg, var(--red-800), var(--red-600));
@@ -95,13 +98,14 @@
   padding: 7px 16px;
   transition: opacity 0.15s;
   white-space: nowrap;
+  box-shadow: 0 0 12px rgba(192, 0, 33, 0.25);
 }
 
-.searchBtn:hover   { opacity: 0.85; }
+.searchBtn:hover    { opacity: 0.85; }
 .searchBtn:disabled { opacity: 0.5; cursor: default; }
 
 .tileToggle {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
@@ -114,8 +118,8 @@
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.tileToggle:hover { background: rgba(64,123,167,0.1); border-color: var(--surface-border-strong); color: var(--text-primary); }
-.tileToggleActive { background: rgba(64,123,167,0.15); border-color: var(--surface-border-strong); color: var(--text-primary); }
+.tileToggle:hover      { background: rgba(64,123,167,0.1); border-color: var(--surface-border-strong); color: var(--text-primary); }
+.tileToggleActive      { background: rgba(64,123,167,0.14); border-color: var(--surface-border-strong); color: var(--text-primary); }
 
 /* ── Sidebar ─────────────────────────────────────── */
 .sidebar {
@@ -131,7 +135,7 @@
 .sidebar::-webkit-scrollbar { display: none; }
 
 .sidebarSection {
-  background: var(--surface);
+  background: linear-gradient(140deg, var(--surface) 0%, rgba(13, 24, 48, 0.85) 100%);
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-md);
   padding: 12px 14px;
@@ -139,17 +143,33 @@
   flex-direction: column;
   gap: 8px;
   flex-shrink: 0;
+  box-shadow:
+    inset 1px 0 0 rgba(64, 123, 167, 0.12),
+    inset 0 1px 0 rgba(64, 123, 167, 0.06);
 }
 
 .sectionLabel {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* Date range */
+.sectionLabel::before {
+  content: '';
+  width: 2px;
+  height: 10px;
+  background: var(--blue-400);
+  border-radius: 1px;
+  flex-shrink: 0;
+  opacity: 0.45;
+}
+
+/* Date range / Min size grid */
 .rangeGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -157,10 +177,10 @@
 }
 
 .rangeBtn {
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 500;
   padding: 6px;
@@ -171,65 +191,43 @@
 .rangeBtn:hover { background: rgba(64,123,167,0.1); border-color: var(--surface-border-strong); color: var(--text-primary); }
 
 .rangeBtnActive {
-  background: linear-gradient(135deg, rgba(192,0,33,0.22), rgba(160,0,28,0.12));
-  border-color: rgba(192,0,33,0.38);
+  background: linear-gradient(135deg, rgba(192, 0, 33, 0.2), rgba(160, 0, 28, 0.1));
+  border-color: rgba(192, 0, 33, 0.35);
   color: var(--text-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-
-/* Presets */
+/* Preset buttons */
 .presetBtn {
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 0.75rem;
   padding: 7px 10px;
   text-align: left;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, padding-left 0.2s;
 }
 
-.presetBtn:hover { background: rgba(64,123,167,0.1); border-color: var(--surface-border-strong); color: var(--text-primary); }
+.presetBtn:hover {
+  background: rgba(64,123,167,0.1);
+  border-color: var(--surface-border-strong);
+  color: var(--text-primary);
+  padding-left: 14px;
+}
 
 /* Metric */
-.metricBig { display: flex; align-items: baseline; gap: 6px; }
-.metricNumber { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.03em; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.metricSub { font-size: 0.75rem; color: var(--text-muted); }
-
-/* Selected */
-.selectedAddr { font-size: 0.8125rem; color: var(--text-primary); font-weight: 500; line-height: 1.4; }
-.selectedMeta { font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; }
-
-.addBtn {
-  margin-top: 2px;
-  background: linear-gradient(135deg, rgba(192,0,33,0.22), rgba(160,0,28,0.12));
-  border: 1px solid rgba(192,0,33,0.32);
-  border-radius: var(--radius-sm);
+.metricBig    { display: flex; align-items: baseline; gap: 7px; }
+.metricNumber {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
   color: var(--text-primary);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  padding: 8px 12px;
-  transition: background 0.15s;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 28px rgba(64, 123, 167, 0.45);
+  line-height: 1;
 }
-
-.addBtn:hover { background: linear-gradient(135deg, rgba(192,0,33,0.38), rgba(160,0,28,0.28)); }
-
-/* ── Map card ────────────────────────────────────── */
-.mapWrapper {
-  grid-row: 2;
-  grid-column: 2;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--surface-border);
-  overflow: hidden;         /* clips the leaflet map to the rounded corners */
-  position: relative;
-}
-
-.map {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  inset: 0;
-}
+.metricSub    { font-size: 0.6875rem; color: var(--text-muted); letter-spacing: 0.02em; }
 
 /* Selected address */
 .addrLine1 {
@@ -242,24 +240,47 @@
 .addrLine2 {
   font-size: 0.75rem;
   color: var(--text-secondary);
-  margin-top: 2px;
+  margin-top: 1px;
+  line-height: 1.4;
 }
 
 .addBtn {
-  margin-top: 6px;
-  background: linear-gradient(135deg, rgba(192,0,33,0.22), rgba(160,0,28,0.12));
-  border: 1px solid rgba(192,0,33,0.32);
+  margin-top: 4px;
+  background: linear-gradient(135deg, var(--red-800), var(--red-600));
+  border: 1px solid rgba(192, 0, 33, 0.4);
   border-radius: var(--radius-sm);
-  color: var(--text-primary);
+  color: var(--white);
   font-size: 0.8125rem;
   font-weight: 600;
-  padding: 8px 12px;
+  padding: 9px 12px;
   width: 100%;
-  transition: background 0.15s;
+  box-shadow: 0 0 18px rgba(192, 0, 33, 0.22), inset 0 1px 0 rgba(255,255,255,0.08);
+  transition: opacity 0.15s, box-shadow 0.15s;
 }
 
 .addBtn:hover {
-  background: linear-gradient(135deg, rgba(192,0,33,0.38), rgba(160,0,28,0.28));
+  opacity: 0.9;
+  box-shadow: 0 0 28px rgba(192, 0, 33, 0.38), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* ── Map card ────────────────────────────────────── */
+.mapWrapper {
+  grid-row: 2;
+  grid-column: 2;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-border);
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    0 0 0 1px rgba(64, 123, 167, 0.06),
+    inset 0 1px 0 rgba(64, 123, 167, 0.08);
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
 }
 
 /* Fixed swath info panel — top-right corner of the map */
@@ -268,13 +289,16 @@
   top: 12px;
   right: 12px;
   z-index: 1000;
-  width: 220px;
-  background: rgba(8, 15, 36, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  width: 226px;
+  background: rgba(5, 10, 28, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--surface-border-strong);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.65),
+    inset 1px 0 0 rgba(64, 123, 167, 0.12),
+    inset 0 1px 0 rgba(64, 123, 167, 0.06);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -283,29 +307,30 @@
 }
 
 .swathDate {
-  font-size: 0.6875rem;
-  font-weight: 500;
+  font-size: 0.625rem;
+  font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
 
 .swathSizeRow {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 7px;
 }
 
 .swathSize {
-  font-size: 1.75rem;
+  font-size: 1.875rem;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   line-height: 1;
+  text-shadow: 0 0 20px rgba(64, 123, 167, 0.4);
 }
 
 .swathSizeLabel {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 
@@ -324,9 +349,9 @@
 }
 
 .swathRemarkLabel {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }

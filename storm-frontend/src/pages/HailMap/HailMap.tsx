@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { MapContainer, TileLayer, Circle, useMap, useMapEvent } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
+import { motion, AnimatePresence } from 'motion/react'
 import HeatmapLayer from '../../components/HeatmapLayer/HeatmapLayer'
 import 'leaflet/dist/leaflet.css'
 import styles from './HailMap.module.css'
+
+const EASE = [0.22, 1, 0.36, 1] as const
 
 const US_BOUNDS: LatLngBoundsExpression = [[15, -135], [58, -55]]
 
@@ -96,7 +99,6 @@ function hailIntensity(size: number) {
   return Math.min((size - 0.75) / 2.25, 1.0)
 }
 
-// Flies map to a new center
 function MapController({ center }: { center: [number, number] | null }) {
   const map = useMap()
   useEffect(() => {
@@ -105,7 +107,6 @@ function MapController({ center }: { center: [number, number] | null }) {
   return null
 }
 
-// Reverse-geocodes every map click via Nominatim and calls onAddress
 function MapClickHandler({ onAddress }: { onAddress: (addr: SelectedAddress) => void }) {
   useMapEvent('click', async (e) => {
     const { lat, lng } = e.latlng
@@ -124,6 +125,20 @@ function MapClickHandler({ onAddress }: { onAddress: (addr: SelectedAddress) => 
   return null
 }
 
+// Staggered sidebar section wrapper
+function SidebarSection({ children, delay }: { children: React.ReactNode; delay: number }) {
+  return (
+    <motion.div
+      className={styles.sidebarSection}
+      initial={{ x: -20, opacity: 0, filter: 'blur(8px)' }}
+      animate={{ x: 0,   opacity: 1, filter: 'blur(0px)' }}
+      transition={{ delay, duration: 0.65, ease: EASE }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
 export default function HailMap() {
   const [reports, setReports]           = useState<HailFeature[]>([])
   const [loading, setLoading]           = useState(true)
@@ -135,7 +150,9 @@ export default function HailMap() {
   const [tileMode, setTileMode]         = useState<'dark' | 'satellite'>('dark')
   const [minSize, setMinSize]           = useState(1.0)
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
-  const [hoveredSwath, setHoveredSwath]       = useState<{ magnitude: number; valid: string; label: string; remark: string } | null>(null)
+  const [hoveredSwath, setHoveredSwath]       = useState<{
+    magnitude: number; valid: string; label: string; remark: string
+  } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -164,9 +181,10 @@ export default function HailMap() {
     if (!searchQuery.trim()) return
     setSearching(true)
     try {
-      const res     = await fetch(`${NOMINATIM}/search?format=json&q=${encodeURIComponent(searchQuery)}`, {
-        headers: { 'Accept-Language': 'en' },
-      })
+      const res     = await fetch(
+        `${NOMINATIM}/search?format=json&q=${encodeURIComponent(searchQuery)}`,
+        { headers: { 'Accept-Language': 'en' } }
+      )
       const results = await res.json()
       if (results.length > 0)
         setMapCenter([parseFloat(results[0].lat), parseFloat(results[0].lon)])
@@ -184,8 +202,13 @@ export default function HailMap() {
   return (
     <div className={styles.page}>
 
-      {/* ── Top bar ────────────────────────────────────────── */}
-      <div className={styles.topBar}>
+      {/* ── Top bar ──────────────────────────────────────── */}
+      <motion.div
+        className={styles.topBar}
+        initial={{ y: -16, opacity: 0, filter: 'blur(8px)' }}
+        animate={{ y: 0,   opacity: 1, filter: 'blur(0px)' }}
+        transition={{ duration: 0.75, ease: EASE, delay: 0.02 }}
+      >
         <div className={styles.topBarLeft}>
           <span className={styles.pageTitle}>Storm Map</span>
           {loading            && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
@@ -211,12 +234,12 @@ export default function HailMap() {
             {tileMode === 'dark' ? '🛰 Satellite' : '🗺 Dark'}
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* ── Sidebar ────────────────────────────────────────── */}
+      {/* ── Sidebar ──────────────────────────────────────── */}
       <div className={styles.sidebar}>
 
-        <div className={styles.sidebarSection}>
+        <SidebarSection delay={0.08}>
           <h3 className={styles.sectionLabel}>Date Range</h3>
           <div className={styles.rangeGrid}>
             {DATE_RANGES.map(r => (
@@ -229,9 +252,9 @@ export default function HailMap() {
               </button>
             ))}
           </div>
-        </div>
+        </SidebarSection>
 
-        <div className={styles.sidebarSection}>
+        <SidebarSection delay={0.15}>
           <h3 className={styles.sectionLabel}>Min Size</h3>
           <div className={styles.rangeGrid}>
             {([0.75, 1.0, 1.5, 2.0] as const).map(s => (
@@ -244,38 +267,52 @@ export default function HailMap() {
               </button>
             ))}
           </div>
-        </div>
+        </SidebarSection>
 
-        <div className={styles.sidebarSection}>
+        <SidebarSection delay={0.22}>
           <h3 className={styles.sectionLabel}>Jump To</h3>
           {PRESETS.map(p => (
             <button key={p.label} className={styles.presetBtn} onClick={() => setMapCenter(p.coords)}>
               {p.label}
             </button>
           ))}
-        </div>
+        </SidebarSection>
 
-        <div className={styles.sidebarSection}>
+        <SidebarSection delay={0.29}>
           <h3 className={styles.sectionLabel}>Reports</h3>
           <div className={styles.metricBig}>
             <span className={styles.metricNumber}>{loading ? '—' : pool.length}</span>
             <span className={styles.metricSub}>strikes · last {rangeDays}d</span>
           </div>
-        </div>
+        </SidebarSection>
 
-        {selectedAddress && (
-          <div className={styles.sidebarSection}>
-            <h3 className={styles.sectionLabel}>Selected Property</h3>
-            <p className={styles.addrLine1}>{selectedAddress.line1}</p>
-            <p className={styles.addrLine2}>{selectedAddress.line2}</p>
-            <button className={styles.addBtn}>+ Add to List</button>
-          </div>
-        )}
+        <AnimatePresence>
+          {selectedAddress && (
+            <motion.div
+              key="selected"
+              className={styles.sidebarSection}
+              initial={{ opacity: 0, y: 12, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
+              exit={{    opacity: 0, y: -8,  filter: 'blur(4px)' }}
+              transition={{ duration: 0.45, ease: EASE }}
+            >
+              <h3 className={styles.sectionLabel}>Selected Property</h3>
+              <p className={styles.addrLine1}>{selectedAddress.line1}</p>
+              <p className={styles.addrLine2}>{selectedAddress.line2}</p>
+              <button className={styles.addBtn}>+ Add to List</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       </div>
 
-      {/* ── Map card ───────────────────────────────────────── */}
-      <div className={styles.mapWrapper}>
+      {/* ── Map card ─────────────────────────────────────── */}
+      <motion.div
+        className={styles.mapWrapper}
+        initial={{ opacity: 0, scale: 0.985, filter: 'blur(14px)' }}
+        animate={{ opacity: 1, scale: 1,     filter: 'blur(0px)'  }}
+        transition={{ duration: 1.05, ease: EASE, delay: 0.1 }}
+      >
         <MapContainer
           className={styles.map}
           center={[37.5, -96]}
@@ -305,7 +342,6 @@ export default function HailMap() {
           <MapClickHandler onAddress={setSelectedAddress} />
           <HeatmapLayer points={heatPoints} />
 
-          {/* Invisible circles to capture hover — drives the fixed info panel */}
           {pool.map((f, i) => {
             const [lng, lat] = f.geometry.coordinates
             const { magnitude: rawMag, city, county, state, valid, remark } = f.properties
@@ -324,27 +360,36 @@ export default function HailMap() {
               />
             )
           })}
-
         </MapContainer>
-        {hoveredSwath && (
-          <div className={styles.swathInfo}>
-            <p className={styles.swathDate}>{formatDate(hoveredSwath.valid)}</p>
-            <div className={styles.swathSizeRow}>
-              <span className={styles.swathSize}>{hoveredSwath.magnitude}"</span>
-              <span className={styles.swathSizeLabel}>hail diameter</span>
-            </div>
-            {hoveredSwath.label && (
-              <p className={styles.swathLocation}>{hoveredSwath.label}</p>
-            )}
-            {hoveredSwath.remark && (
-              <div className={styles.swathRemarkBlock}>
-                <p className={styles.swathRemarkLabel}>Description</p>
-                <p className={styles.swathRemark}>{hoveredSwath.remark}</p>
+
+        <AnimatePresence>
+          {hoveredSwath && (
+            <motion.div
+              key="swath"
+              className={styles.swathInfo}
+              initial={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
+              exit={{    opacity: 0, y: -4,  filter: 'blur(4px)' }}
+              transition={{ duration: 0.25, ease: EASE }}
+            >
+              <p className={styles.swathDate}>{formatDate(hoveredSwath.valid)}</p>
+              <div className={styles.swathSizeRow}>
+                <span className={styles.swathSize}>{hoveredSwath.magnitude}"</span>
+                <span className={styles.swathSizeLabel}>hail diameter</span>
               </div>
-            )}
-          </div>
-        )}
-      </div>
+              {hoveredSwath.label && (
+                <p className={styles.swathLocation}>{hoveredSwath.label}</p>
+              )}
+              {hoveredSwath.remark && (
+                <div className={styles.swathRemarkBlock}>
+                  <p className={styles.swathRemarkLabel}>Description</p>
+                  <p className={styles.swathRemark}>{hoveredSwath.remark}</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
 
     </div>
   )
