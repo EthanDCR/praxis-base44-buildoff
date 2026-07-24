@@ -262,51 +262,80 @@
   background: linear-gradient(135deg, rgba(192,0,33,0.38), rgba(160,0,28,0.28));
 }
 
-/* Hail swath hover tooltip */
-:global(.leaflet-tooltip.hailTooltip),
-.mapWrapper :global(.leaflet-tooltip) {
-  background: rgba(8, 15, 36, 0.95);
+/* Fixed swath info panel — top-right corner of the map */
+.swathInfo {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  width: 220px;
+  background: rgba(8, 15, 36, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--surface-border-strong);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 10px;
   pointer-events: none;
 }
 
-:global(.leaflet-tooltip.hailTooltip)::before,
-.mapWrapper :global(.leaflet-tooltip::before) {
-  display: none;
-}
-
-.ttDate {
-  font-size: 0.75rem;
+.swathDate {
+  font-size: 0.6875rem;
+  font-weight: 500;
   color: var(--text-muted);
-  font-family: 'Inter', system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.ttSize {
-  font-size: 1.125rem;
+.swathSizeRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.swathSize {
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
-  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
-.ttLocation {
+.swathSizeLabel {
   font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text-muted);
 }
 
-.ttRemark {
+.swathLocation {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--surface-border);
+  padding-top: 10px;
+}
+
+.swathRemarkBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.swathRemarkLabel {
   font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-muted);
-  font-family: 'Inter', system-ui, sans-serif;
-  margin-top: 2px;
-  font-style: italic;
+}
+
+.swathRemark {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 /* Dark-theme Leaflet popup */

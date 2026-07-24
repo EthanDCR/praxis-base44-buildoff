@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MapContainer, TileLayer, Circle, Tooltip, useMap, useMapEvent } from 'react-leaflet'
+import { MapContainer, TileLayer, Circle, useMap, useMapEvent } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 import HeatmapLayer from '../../components/HeatmapLayer/HeatmapLayer'
 import 'leaflet/dist/leaflet.css'
@@ -86,6 +86,12 @@ interface SelectedAddress {
   lng: number
 }
 
+// IEM sometimes encodes hail size as hundredths of an inch (75 → 0.75")
+// No real hailstone exceeds 10", so anything above that is the encoded form
+function normalizeMagnitude(magnitude: number): number {
+  return magnitude > 10 ? magnitude / 100 : magnitude
+}
+
 function hailIntensity(size: number) {
   return Math.min((size - 0.75) / 2.25, 1.0)
 }
@@ -129,6 +135,7 @@ export default function HailMap() {
   const [tileMode, setTileMode]         = useState<'dark' | 'satellite'>('dark')
   const [minSize, setMinSize]           = useState(1.0)
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
+  const [hoveredSwath, setHoveredSwath]       = useState<{ magnitude: number; valid: string; label: string; remark: string } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -168,10 +175,10 @@ export default function HailMap() {
     }
   }, [searchQuery])
 
-  const pool       = reports.filter(f => (f.properties.magnitude ?? 0) >= minSize)
+  const pool       = reports.filter(f => normalizeMagnitude(f.properties.magnitude ?? 0) >= minSize)
   const heatPoints = pool.map<[number, number, number]>(f => {
     const [lng, lat] = f.geometry.coordinates
-    return [lat, lng, hailIntensity(f.properties.magnitude ?? 0)]
+    return [lat, lng, hailIntensity(normalizeMagnitude(f.properties.magnitude ?? 0))]
   })
 
   return (
@@ -298,10 +305,11 @@ export default function HailMap() {
           <MapClickHandler onAddress={setSelectedAddress} />
           <HeatmapLayer points={heatPoints} />
 
-          {/* Invisible geographic circles for hover tooltips — match heatmap radius */}
+          {/* Invisible circles to capture hover — drives the fixed info panel */}
           {pool.map((f, i) => {
             const [lng, lat] = f.geometry.coordinates
-            const { magnitude, city, county, state, valid, remark } = f.properties
+            const { magnitude: rawMag, city, county, state, valid, remark } = f.properties
+            const magnitude = normalizeMagnitude(rawMag ?? 0)
             const label = [city, county, state].filter(Boolean).join(', ')
             return (
               <Circle
@@ -309,18 +317,33 @@ export default function HailMap() {
                 center={[lat, lng]}
                 radius={5000}
                 pathOptions={{ fillOpacity: 0.01, opacity: 0, weight: 0, interactive: true }}
-              >
-                <Tooltip sticky className={styles.hailTooltip}>
-                  <span className={styles.ttDate}>{formatDate(valid)}</span>
-                  <span className={styles.ttSize}>{magnitude}"</span>
-                  {label && <span className={styles.ttLocation}>{label}</span>}
-                  {remark && <span className={styles.ttRemark}>{remark}</span>}
-                </Tooltip>
-              </Circle>
+                eventHandlers={{
+                  mouseover: () => setHoveredSwath({ magnitude, valid, label, remark }),
+                  mouseout:  () => setHoveredSwath(null),
+                }}
+              />
             )
           })}
 
         </MapContainer>
+        {hoveredSwath && (
+          <div className={styles.swathInfo}>
+            <p className={styles.swathDate}>{formatDate(hoveredSwath.valid)}</p>
+            <div className={styles.swathSizeRow}>
+              <span className={styles.swathSize}>{hoveredSwath.magnitude}"</span>
+              <span className={styles.swathSizeLabel}>hail diameter</span>
+            </div>
+            {hoveredSwath.label && (
+              <p className={styles.swathLocation}>{hoveredSwath.label}</p>
+            )}
+            {hoveredSwath.remark && (
+              <div className={styles.swathRemarkBlock}>
+                <p className={styles.swathRemarkLabel}>Description</p>
+                <p className={styles.swathRemark}>{hoveredSwath.remark}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
     </div>
