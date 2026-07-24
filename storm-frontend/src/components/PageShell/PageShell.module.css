@@ -1,0 +1,44 @@
+.page {
+  flex: 1;
+  padding: 40px 40px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subtitle {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+.divider {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    var(--surface-border-strong),
+    var(--surface-border),
+    transparent
+  );
+  margin-top: 4px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 4px;
+}

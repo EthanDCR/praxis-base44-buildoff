@@ -1,0 +1,246 @@
+/* Page fills the space below the navbar exactly — no overflow */
+.page {
+  height: calc(100vh - var(--nav-height));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 252px 1fr;
+  gap: 10px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+/* ── Top bar ─────────────────────────────────────── */
+.topBar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+}
+
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.pageTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 100px;
+}
+
+.badgeLive {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+}
+
+.badgeLoading {
+  background: rgba(64, 123, 167, 0.12);
+  color: var(--text-secondary);
+  border: 1px solid var(--surface-border);
+}
+
+.badgeError {
+  background: rgba(192, 0, 33, 0.12);
+  color: #ff6b6b;
+  border: 1px solid rgba(192, 0, 33, 0.28);
+}
+
+.searchRow {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  max-width: 420px;
+}
+
+.searchInput {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.searchInput::placeholder { color: var(--text-muted); }
+.searchInput:focus { border-color: var(--surface-border-strong); }
+
+.searchBtn {
+  background: linear-gradient(135deg, var(--red-800), var(--red-600));
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--white);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 7px 16px;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.searchBtn:hover   { opacity: 0.85; }
+.searchBtn:disabled { opacity: 0.5; cursor: default; }
+
+.tileToggle {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 7px 12px;
+  white-space: nowrap;
+  width: 110px;
+  text-align: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.tileToggle:hover { background: rgba(64,123,167,0.1); border-color: var(--surface-border-strong); color: var(--text-primary); }
+.tileToggleActive { background: rgba(64,123,167,0.15); border-color: var(--surface-border-strong); color: var(--text-primary); }
+
+/* ── Sidebar ─────────────────────────────────────── */
+.sidebar {
+  grid-row: 2;
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.sidebar::-webkit-scrollbar { display: none; }
+
+.sidebarSection {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sectionLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Date range */
+.rangeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.rangeBtn {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 6px;
+  text-align: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.rangeBtn:hover { background: rgba(64,123,167,0.1); border-color: var(--surface-border-strong); color: var(--text-primary); }
+
+.rangeBtnActive {
+  background: linear-gradient(135deg, rgba(192,0,33,0.22), rgba(160,0,28,0.12));
+  border-color: rgba(192,0,33,0.38);
+  color: var(--text-primary);
+}
+
+
+/* Presets */
+.presetBtn {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 7px 10px;
+  text-align: left;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.presetBtn:hover { background: rgba(64,123,167,0.1); border-color: var(--surface-border-strong); color: var(--text-primary); }
+
+/* Metric */
+.metricBig { display: flex; align-items: baseline; gap: 6px; }
+.metricNumber { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.03em; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.metricSub { font-size: 0.75rem; color: var(--text-muted); }
+
+/* Selected */
+.selectedAddr { font-size: 0.8125rem; color: var(--text-primary); font-weight: 500; line-height: 1.4; }
+.selectedMeta { font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; }
+
+.addBtn {
+  margin-top: 2px;
+  background: linear-gradient(135deg, rgba(192,0,33,0.22), rgba(160,0,28,0.12));
+  border: 1px solid rgba(192,0,33,0.32);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  transition: background 0.15s;
+}
+
+.addBtn:hover { background: linear-gradient(135deg, rgba(192,0,33,0.38), rgba(160,0,28,0.28)); }
+
+/* ── Map card ────────────────────────────────────── */
+.mapWrapper {
+  grid-row: 2;
+  grid-column: 2;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-border);
+  overflow: hidden;         /* clips the leaflet map to the rounded corners */
+  position: relative;
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+/* Dark-theme Leaflet popup */
+.mapWrapper :global(.leaflet-popup-content-wrapper) {
+  background: #0d1830;
+  border: 1px solid var(--surface-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+  font-size: 0.8125rem;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.mapWrapper :global(.leaflet-popup-tip)          { background: #0d1830; }
+.mapWrapper :global(.leaflet-popup-close-button) { color: var(--text-muted); }
