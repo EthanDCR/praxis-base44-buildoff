@@ -475,6 +475,24 @@
 }
 
 /* Fixed swath info panel — top-right corner of the map */
+.zoomPrompt {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(5, 10, 28, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--surface-border-strong);
+  border-radius: 999px;
+  padding: 8px 18px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
 .swathInfo {
   position: absolute;
   top: 12px;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { base44 } from '../../lib/base44'
-import { MapContainer, TileLayer, Circle, useMap, useMapEvent } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap, useMapEvent } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 import { motion, AnimatePresence } from 'motion/react'
 import HeatmapLayer from '../../components/HeatmapLayer/HeatmapLayer'
@@ -8,8 +8,9 @@ import 'leaflet/dist/leaflet.css'
 import styles from './HailMap.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
-
 const US_BOUNDS: LatLngBoundsExpression = [[15, -135], [58, -55]]
+const SWDI_BASE = 'https://www.ncei.noaa.gov/swdiws/json/nx3hail'
+const MIN_ZOOM_TO_FETCH = 7
 
 const TILES = {
   dark: {
@@ -25,31 +26,66 @@ const TILES = {
 }
 
 // ---------------------------------------------------------------------------
-// Iowa Environmental Mesonet — Local Storm Reports (hail only)
-// Properties: magnitude (inches), city, county, state, valid (ISO-8601), remark
-// Geometry: GeoJSON Point [longitude, latitude]
+// NOAA SWDI — NEXRAD Level-3 Hail Signatures
+// SHAPE: WKT "POINT (lon lat)", MAXSIZE: inches, PROB/SEVPROB: 0-100, ZTIME: ISO-8601
+// Max date range: 744 hours (~31 days). Fetched per map viewport.
 // ---------------------------------------------------------------------------
-const IEM_BASE  = 'https://mesonet.agron.iastate.edu/geojson/lsr.php'
-const NOMINATIM = 'https://nominatim.openstreetmap.org'
 
-function iemDate(d: Date) {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}`
+interface SwdiRecord {
+  SHAPE:   string  // "POINT (lon lat)"
+  MAXSIZE: string  // hail size in inches
+  PROB:    string  // probability of hail 0-100
+  SEVPROB: string  // probability of severe hail 0-100
+  ZTIME:   string  // ISO-8601 UTC
+  WSR_ID:  string  // radar station ID
+  CELL_ID: string
 }
 
-function buildUrl(days: number) {
+interface HoverInfo {
+  record: SwdiRecord
+}
+
+interface ViewState {
+  north: number
+  south: number
+  east:  number
+  west:  number
+  zoom:  number
+}
+
+interface SelectedAddress {
+  display: string
+  line1:   string
+  line2:   string
+  lat:     number
+  lng:     number
+}
+
+// Parse WKT POINT — returns [lat, lon]
+function parsePoint(shape: string): [number, number] | null {
+  const m = shape.match(/POINT \(([^ ]+) ([^)]+)\)/)
+  if (!m) return null
+  return [parseFloat(m[2]), parseFloat(m[1])]
+}
+
+function swdiDate(d: Date) {
+  return d.toISOString().slice(0, 10).replace(/-/g, '')
+}
+
+function buildUrl(days: number, view: ViewState) {
   const now   = new Date()
   const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-  return `${IEM_BASE}?sts=${iemDate(start)}&ets=${iemDate(now)}&type=H`
+  const bbox  = `${view.west.toFixed(3)},${view.south.toFixed(3)},${view.east.toFixed(3)},${view.north.toFixed(3)}`
+  return `${SWDI_BASE}/${swdiDate(start)}:${swdiDate(now)}?bbox=${bbox}`
 }
 
-function formatDate(valid: string) {
+function formatDate(ztime: string) {
   try {
-    return new Date(valid).toLocaleString('en-US', {
+    return new Date(ztime).toLocaleString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
       hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
     })
-  } catch { return valid }
+  } catch { return ztime }
 }
 
 const DATE_RANGES = [
@@ -59,45 +95,12 @@ const DATE_RANGES = [
   { label: '30 Days', days: 30 },
 ]
 
-
-interface HailProps {
-  magnitude: number
-  city: string
-  county: string
-  state: string
-  valid: string
-  remark: string
-}
-
-interface HailFeature {
-  type: 'Feature'
-  geometry: { type: 'Point'; coordinates: [number, number] }
-  properties: HailProps
-}
-
-interface SelectedAddress {
-  display: string
-  line1: string
-  line2: string
-  lat: number
-  lng: number
-}
-
-// IEM sometimes encodes hail size as hundredths of an inch (75 → 0.75")
-// No real hailstone exceeds 10", so anything above that is the encoded form
-function normalizeMagnitude(magnitude: number): number {
-  const n = magnitude > 10 ? magnitude / 100 : magnitude
-  return Math.min(n, 2.5)
-}
-
-function hailIntensity(size: number) {
-  return Math.min((size - 0.75) / 2.25, 1.0)
-}
+const NOMINATIM = 'https://nominatim.openstreetmap.org'
 
 function MapController({ center }: { center: [number, number] | null }) {
   const map = useMap()
   useEffect(() => {
-    if (center) map.flyTo(center, 18, { duration: 1.5 })
+    if (center) map.flyTo(center, 10, { duration: 1.5 })
   }, [center, map])
   return null
 }
@@ -115,12 +118,51 @@ function MapClickHandler({ onAddress }: { onAddress: (addr: SelectedAddress) => 
       const line1 = [a.house_number, a.road].filter(Boolean).join(' ') || data.display_name?.split(',')[0]
       const line2 = [a.city || a.town || a.village, a.state].filter(Boolean).join(', ')
       onAddress({ display: data.display_name, line1, line2, lat, lng })
-    } catch { /* silently ignore */ }
+    } catch { /* ignore */ }
   })
   return null
 }
 
-// Staggered sidebar section wrapper
+function HoverTracker({ pool, onHover }: { pool: SwdiRecord[]; onHover: (info: HoverInfo | null) => void }) {
+  const map = useMap()
+
+  useMapEvent('mousemove', (e) => {
+    if (pool.length === 0) { onHover(null); return }
+    // Threshold scales with zoom: ~40km at z7, ~5km at z10, ~0.6km at z13
+    const thresholdM = 40000 / Math.pow(2, map.getZoom() - 7)
+    let nearest: SwdiRecord | null = null
+    let minDist = thresholdM
+    for (const r of pool) {
+      const coord = parsePoint(r.SHAPE)
+      if (!coord) continue
+      const dist = e.latlng.distanceTo(coord)
+      if (dist < minDist) { minDist = dist; nearest = r }
+    }
+    onHover(nearest ? { record: nearest } : null)
+  })
+
+  useMapEvent('mouseout', () => onHover(null))
+  return null
+}
+
+function BoundsTracker({ onView }: { onView: (v: ViewState) => void }) {
+  const map = useMap()
+
+  const report = useCallback(() => {
+    const b = map.getBounds()
+    onView({
+      north: b.getNorth(), south: b.getSouth(),
+      east:  b.getEast(),  west:  b.getWest(),
+      zoom:  map.getZoom(),
+    })
+  }, [map, onView])
+
+  useEffect(() => { report() }, [report])
+  useMapEvent('moveend', report)
+  useMapEvent('zoomend', report)
+  return null
+}
+
 function SidebarSection({ children, delay }: { children: React.ReactNode; delay: number }) {
   return (
     <motion.div
@@ -135,10 +177,11 @@ function SidebarSection({ children, delay }: { children: React.ReactNode; delay:
 }
 
 export default function HailMap() {
-  const [reports, setReports]           = useState<HailFeature[]>([])
-  const [loading, setLoading]           = useState(true)
+  const [records, setRecords]           = useState<SwdiRecord[]>([])
+  const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState<string | null>(null)
   const [rangeDays, setRangeDays]       = useState(7)
+  const [viewState, setViewState]       = useState<ViewState | null>(null)
   const [mapCenter, setMapCenter]       = useState<[number, number] | null>(null)
   const [searchQuery, setSearchQuery]   = useState('')
   const [searching, setSearching]       = useState(false)
@@ -156,36 +199,34 @@ export default function HailMap() {
   const [showDropdown, setShowDropdown]       = useState(false)
   const [addingTarget, setAddingTarget]       = useState(false)
   const [addedFeedback, setAddedFeedback]     = useState(false)
-  const [hoveredSwath, setHoveredSwath]       = useState<{
-    magnitude: number; valid: string; label: string; remark: string
-  } | null>(null)
+  const [hoveredInfo, setHoveredInfo]         = useState<HoverInfo | null>(null)
 
+  const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Fetch SWDI data whenever viewport or date range changes
   useEffect(() => {
-    let cancelled = false
-    async function load() {
+    if (!viewState || viewState.zoom < MIN_ZOOM_TO_FETCH) return
+
+    if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
+    fetchTimerRef.current = setTimeout(async () => {
       setLoading(true)
       setError(null)
       try {
-        const res      = await fetch(buildUrl(rangeDays))
-        if (!res.ok) throw new Error(`IEM responded with ${res.status}`)
-        const geojson  = await res.json()
-        const features = (geojson.features ?? []).filter(
-          (f: HailFeature) => f.geometry?.coordinates?.length === 2
-        )
-        if (!cancelled) setReports(features)
+        const res  = await fetch(buildUrl(rangeDays, viewState))
+        if (!res.ok) throw new Error(`SWDI ${res.status}`)
+        const data = await res.json()
+        setRecords(data.result ?? [])
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load data')
+        setError(e instanceof Error ? e.message : 'Failed to load data')
       } finally {
-        if (!cancelled) setLoading(false)
+        setLoading(false)
       }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [rangeDays])
+    }, 400)
 
-  // Load all call lists on mount
+    return () => { if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current) }
+  }, [rangeDays, viewState])
+
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     base44.entities.CallList.list().then((data: any) => setLists(data)).catch(console.error)
   }, [])
 
@@ -193,7 +234,6 @@ export default function HailMap() {
     if (!newListName.trim() || creatingList) return
     setCreatingList(true)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const list = await base44.entities.CallList.create({ name: newListName.trim() }) as any
       setLists(prev => [...prev, list])
       setActiveListId(list.id)
@@ -226,18 +266,15 @@ export default function HailMap() {
     }
   }
 
-  // Close suggestions on any click outside the search wrapper
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node))
         setShowSuggestions(false)
-      }
     }
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
 
-  // Debounced autocomplete
   useEffect(() => {
     const q = searchQuery.trim()
     if (q.length < 2) { setSuggestions([]); return }
@@ -247,8 +284,7 @@ export default function HailMap() {
           `${NOMINATIM}/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=us`,
           { headers: { 'Accept-Language': 'en' } }
         )
-        const data = await res.json()
-        setSuggestions(data)
+        setSuggestions(await res.json())
         setShowSuggestions(true)
       } catch { /* ignore */ }
     }, 300)
@@ -280,11 +316,25 @@ export default function HailMap() {
     setShowSuggestions(false)
   }
 
-  const pool       = reports.filter(f => normalizeMagnitude(f.properties.magnitude ?? 0) >= minSize)
-  const heatPoints = pool.map<[number, number, number]>(f => {
-    const [lng, lat] = f.geometry.coordinates
-    return [lat, lng, hailIntensity(normalizeMagnitude(f.properties.magnitude ?? 0))]
-  })
+  const handleView = useCallback((v: ViewState) => setViewState(v), [])
+
+  const pool = records.filter(r => parseFloat(r.MAXSIZE) >= minSize)
+
+  const heatPoints = pool
+    .map(r => {
+      const coord = parsePoint(r.SHAPE)
+      if (!coord) return null
+      const size      = parseFloat(r.MAXSIZE)
+      const intensity = Math.min((size - 0.5) / 2.5, 1.0)
+      return [coord[0], coord[1], intensity] as [number, number, number]
+    })
+    .filter((p): p is [number, number, number] => p !== null)
+
+  const maxSize = pool.length > 0
+    ? Math.max(...pool.map(r => parseFloat(r.MAXSIZE)))
+    : 0
+
+  const needsZoomIn = viewState !== null && viewState.zoom < MIN_ZOOM_TO_FETCH
 
   return (
     <div className={styles.page}>
@@ -298,13 +348,14 @@ export default function HailMap() {
       >
         <div className={styles.topBarLeft}>
           <span className={styles.pageTitle}>Storm Map</span>
-          {loading            && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
-          {!loading && !error && <span className={`${styles.badge} ${styles.badgeLive}`}>● Live</span>}
-          {error              && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {error}</span>}
-          {!loading && !error && (
+          {needsZoomIn && <span className={`${styles.badge} ${styles.badgeLoading}`}>Zoom in to load</span>}
+          {!needsZoomIn && loading && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
+          {!needsZoomIn && !loading && !error && <span className={`${styles.badge} ${styles.badgeLive}`}>● Live</span>}
+          {error && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {error}</span>}
+          {!needsZoomIn && !loading && !error && pool.length > 0 && (
             <span className={styles.strikeCount}>
-              <span className={styles.strikeNum}>{pool.length}</span>
-              <span className={styles.strikeSub}>strikes · last {rangeDays}d</span>
+              <span className={styles.strikeNum}>{pool.length.toLocaleString()}</span>
+              <span className={styles.strikeSub}>signatures · last {rangeDays}d · max {maxSize}"</span>
             </span>
           )}
         </div>
@@ -464,7 +515,7 @@ export default function HailMap() {
 
       </div>
 
-      {/* ── Map card ─────────────────────────────────────── */}
+      {/* ── Map ──────────────────────────────────────────── */}
       <motion.div
         className={styles.mapWrapper}
         initial={{ opacity: 0, scale: 0.985, filter: 'blur(14px)' }}
@@ -500,52 +551,37 @@ export default function HailMap() {
 
           <MapController center={mapCenter} />
           <MapClickHandler onAddress={setSelectedAddress} />
+          <BoundsTracker onView={handleView} />
+          <HoverTracker pool={pool} onHover={setHoveredInfo} />
           <HeatmapLayer points={heatPoints} />
-
-          {pool.map((f, i) => {
-            const [lng, lat] = f.geometry.coordinates
-            const { magnitude: rawMag, city, county, state, valid, remark } = f.properties
-            const magnitude = normalizeMagnitude(rawMag ?? 0)
-            const label = [city, county, state].filter(Boolean).join(', ')
-            return (
-              <Circle
-                key={i}
-                center={[lat, lng]}
-                radius={5000}
-                pathOptions={{ fillOpacity: 0.01, opacity: 0, weight: 0, interactive: true }}
-                eventHandlers={{
-                  mouseover: () => setHoveredSwath({ magnitude, valid, label, remark }),
-                  mouseout:  () => setHoveredSwath(null),
-                }}
-              />
-            )
-          })}
         </MapContainer>
 
+        {needsZoomIn && (
+          <div className={styles.zoomPrompt}>
+            Zoom in to load radar hail data
+          </div>
+        )}
+
         <AnimatePresence>
-          {hoveredSwath && (
+          {hoveredInfo && (
             <motion.div
-              key="swath"
+              key="hover"
               className={styles.swathInfo}
               initial={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
               animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
               exit={{    opacity: 0, y: -4,  filter: 'blur(4px)' }}
-              transition={{ duration: 0.25, ease: EASE }}
+              transition={{ duration: 0.18, ease: EASE }}
             >
-              <p className={styles.swathDate}>{formatDate(hoveredSwath.valid)}</p>
+              <p className={styles.swathDate}>{formatDate(hoveredInfo.record.ZTIME)}</p>
               <div className={styles.swathSizeRow}>
-                <span className={styles.swathSize}>{hoveredSwath.magnitude}"</span>
-                <span className={styles.swathSizeLabel}>hail diameter</span>
+                <span className={styles.swathSize}>{parseFloat(hoveredInfo.record.MAXSIZE).toFixed(2)}"</span>
+                <span className={styles.swathSizeLabel}>radar hail size</span>
               </div>
-              {hoveredSwath.label && (
-                <p className={styles.swathLocation}>{hoveredSwath.label}</p>
-              )}
-              {hoveredSwath.remark && (
-                <div className={styles.swathRemarkBlock}>
-                  <p className={styles.swathRemarkLabel}>Description</p>
-                  <p className={styles.swathRemark}>{hoveredSwath.remark}</p>
-                </div>
-              )}
+              <div className={styles.swathSizeRow}>
+                <span className={styles.swathSize}>{hoveredInfo.record.SEVPROB}%</span>
+                <span className={styles.swathSizeLabel}>severe probability</span>
+              </div>
+              <p className={styles.swathLocation}>Radar: {hoveredInfo.record.WSR_ID}</p>
             </motion.div>
           )}
         </AnimatePresence>
