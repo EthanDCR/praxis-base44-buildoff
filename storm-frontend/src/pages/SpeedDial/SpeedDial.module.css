@@ -26,7 +26,50 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Start / Stop dialing */
+.startBtn {
+  margin-left: auto;
   flex-shrink: 0;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 4px;
+  color: #22c55e;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 7px 16px;
+  letter-spacing: 0.03em;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.startBtn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+.startBtn:disabled { opacity: 0.35; cursor: default; }
+
+.stopBtn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 7px 16px;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.stopBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--surface-border-strong);
 }
 
 .pageTitle {
@@ -153,6 +196,22 @@
   border-radius: var(--radius-md);
 }
 
+/* ── Workspace: target info + dialer ────────────────────────────────────── */
+.workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.targetInfo {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-width: 0;
+  border-right: 1px solid var(--surface-border);
+}
+
 /* ── Queue ───────────────────────────────────────────────────────────────── */
 .queue {
   width: 256px;
@@ -219,14 +278,6 @@
 
 .qAddr    { font-size: 0.8125rem; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qContact { font-size: 0.6875rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* ── Workspace ───────────────────────────────────────────────────────────── */
-.workspace {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-  min-width: 0;
-}
 
 .emptyState {
   height: 100%;
@@ -360,7 +411,18 @@
   letter-spacing: 0.015em;
 }
 
-.callBtn {
+/* Active phone row — glow on the number */
+.phoneRowActive {
+  position: relative;
+}
+
+.phoneActive {
+  color: var(--text-primary);
+  font-weight: 600;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.25);
+}
+
+.dialLoadBtn {
   background: none; border: none;
   color: var(--text-muted); font-family: inherit;
   font-size: 0.6875rem; font-weight: 700;
@@ -368,7 +430,8 @@
   padding: 3px 0; flex-shrink: 0;
   transition: color 0.12s;
 }
-.callBtn:hover { color: var(--text-primary); }
+.dialLoadBtn:hover       { color: var(--text-primary); }
+.dialLoadBtnActive       { color: var(--text-secondary); }
 
 .emailRow {
   font-size: 0.75rem;
@@ -376,84 +439,108 @@
   margin-top: 2px;
 }
 
-/* ── Outcome bar ─────────────────────────────────────────────────────────── */
-.outcome {
-  border-top: 1px solid var(--surface-border);
-  padding: 14px 28px;
-  flex-shrink: 0;
-}
-
-.outcomeBtns {
+/* ── Outcome modal ───────────────────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 200;
   display: flex;
   align-items: center;
+  justify-content: center;
+}
+
+.modalPanel {
+  background: var(--surface-raised);
+  border: 1px solid var(--surface-border-strong);
+  border-radius: var(--radius-md);
+  width: 460px;
+  max-width: 90vw;
+  padding: 24px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.modalHeader {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
-.outcomeBtn {
+.modalTitle {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.modalContext {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.outcomeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.outcomeOption {
   background: none;
-  border: none;
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
   color: var(--text-muted);
   font-family: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
-  padding: 8px 14px;
-  border-radius: 4px;
-  transition: color 0.12s, background 0.12s;
-  white-space: nowrap;
+  padding: 10px 14px;
+  text-align: left;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 
-.outcomeBtn:hover:not(:disabled) {
+.outcomeOption:hover {
   color: var(--text-primary);
-  background: rgba(255,255,255,0.04);
+  border-color: var(--surface-border-strong);
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.outcomeBtn:disabled { opacity: 0.35; cursor: default; }
-
-.outcomeSold {
-  margin-left: auto;
-  color: var(--text-secondary);
+.outcomeOptionSelected {
+  color: var(--text-primary);
+  border-color: var(--surface-border-strong);
+  background: rgba(255, 255, 255, 0.06);
   font-weight: 600;
 }
 
-/* Notes / confirm */
-.notesBox { display: flex; flex-direction: column; gap: 8px; }
-
-.notesLabel {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+.outcomeOptionWide {
+  grid-column: 1 / -1;
 }
 
-.notesInput {
-  background: rgba(255,255,255,0.02);
+.modalNotes {
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--surface-border);
   border-radius: 4px;
   color: var(--text-primary);
   font-family: inherit;
   font-size: 0.8125rem;
-  padding: 8px 12px;
+  padding: 10px 12px;
   resize: none;
   outline: none;
-  transition: border-color 0.15s;
   line-height: 1.5;
+  transition: border-color 0.15s;
 }
 
-.notesInput::placeholder { color: var(--text-muted); }
-.notesInput:focus         { border-color: var(--surface-border-strong); }
+.modalNotes::placeholder { color: var(--text-muted); }
+.modalNotes:focus         { border-color: var(--surface-border-strong); }
 
-.notesActions { display: flex; gap: 8px; justify-content: flex-end; }
-
-.cancelBtn {
-  background: none; border: none;
-  color: var(--text-muted); font-family: inherit;
-  font-size: 0.8125rem; padding: 8px 12px;
-  transition: color 0.12s;
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
 }
-.cancelBtn:hover { color: var(--text-secondary); }
 
-.confirmBtn {
+.modalSubmit {
   background: none;
   border: 1px solid var(--surface-border-strong);
   border-radius: 4px;
@@ -461,9 +548,249 @@
   font-family: inherit;
   font-size: 0.8125rem;
   font-weight: 600;
-  padding: 8px 18px;
+  padding: 9px 22px;
+  letter-spacing: 0.02em;
   transition: background 0.12s;
 }
 
-.confirmBtn:hover:not(:disabled) { background: rgba(255,255,255,0.05); }
-.confirmBtn:disabled              { opacity: 0.4; cursor: default; }
+.modalSubmit:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+.modalSubmit:disabled              { opacity: 0.3; cursor: default; }
+
+/* Previous call note strip */
+.prevNote {
+  border-top: 1px solid var(--surface-border);
+  padding: 12px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.prevNoteLabel {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.prevNoteText {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* ── Right panel (dialer + transcript) ───────────────────────────────────── */
+.rightPanel {
+  width: 252px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--surface-border);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.panelLabel {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--surface-border);
+  flex-shrink: 0;
+}
+
+/* Dialer section */
+.dialerSection {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.dialerBody {
+  padding: 16px;
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialerIdle { text-align: center; }
+
+.dialerIdleText {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.dialerLoaded {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dialerNum {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.dialerName {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.callBtn {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--surface-border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 9px;
+  transition: background 0.12s;
+}
+
+.callBtn:hover { background: rgba(255,255,255,0.05); }
+
+.dialerClear {
+  background: none; border: none;
+  color: var(--text-muted); font-family: inherit;
+  font-size: 0.75rem; padding: 5px 0;
+  text-align: center; width: 100%;
+  transition: color 0.12s;
+}
+.dialerClear:hover { color: var(--text-secondary); }
+
+.dialerActive {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dialerStatusTag {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.dialerTimer {
+  font-size: 1.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.dialerActiveNum {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dialerActiveName {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.hangUpBtn {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 8px;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.hangUpBtn:hover { color: var(--text-primary); border-color: var(--surface-border-strong); }
+
+.dialerFooter {
+  padding: 8px 16px 10px;
+  border-top: 1px solid var(--surface-border);
+}
+
+.twilioStatus {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+}
+
+.twilioStatusOk {
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  color: #22c55e;
+  opacity: 0.7;
+}
+
+/* Transcript section */
+.transcriptSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.transcriptBody {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.transcriptBody::-webkit-scrollbar { display: none; }
+
+.transcriptEmpty {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  font-style: italic;
+}
+
+.utterance {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.utteranceLabel {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.utteranceText {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.utteranceAgent .utteranceLabel { color: var(--blue-400); opacity: 0.7; }
+.utteranceAgent .utteranceText  { color: var(--text-primary); }

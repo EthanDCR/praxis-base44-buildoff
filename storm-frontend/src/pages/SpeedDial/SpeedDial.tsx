@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
+import { Device, Call } from '@twilio/voice-sdk'
 import { base44 } from '../../lib/base44'
 import styles from './SpeedDial.module.css'
 
@@ -26,19 +27,50 @@ interface Target {
   notes?: string
 }
 
-interface CallList {
-  id: string
-  name: string
+interface CallList { id: string; name: string }
+interface Utterance { speaker: 'agent' | 'contact'; text: string; ts: number }
+
+type Filter       = 'all' | 'new' | 'callback'
+type CallState    = 'idle' | 'active'
+type OutcomeOption =
+  | 'lead_set'
+  | 'scheduled_callback'
+  | 'told_no'
+  | 'voicemail'
+  | 'no_answer'
+  | 'wrong_person'
+  | 'wrong_person_same_name'
+  | 'dead_number'
+
+const OUTCOME_LABEL: Record<OutcomeOption, string> = {
+  lead_set:               'Inspection Set',
+  scheduled_callback:     'Scheduled Callback',
+  told_no:                'Told No',
+  voicemail:              'Voicemail',
+  no_answer:              'No Answer',
+  wrong_person:           'Wrong Person',
+  wrong_person_same_name: 'Wrong Person / Same Name',
+  dead_number:            'Dead Number',
 }
 
-type Filter = 'all' | 'new' | 'callback'
+const OUTCOME_TO_STATUS: Record<OutcomeOption, Target['status']> = {
+  lead_set:               'sold',
+  scheduled_callback:     'callback',
+  told_no:                'not_interested',
+  voicemail:              'called',
+  no_answer:              'called',
+  wrong_person:           'called',
+  wrong_person_same_name: 'called',
+  dead_number:            'called',
+}
 
 const STATUS_LABEL: Record<string, string> = {
-  new:            'New',
-  called:         'Called',
-  callback:       'Callback',
-  not_interested: 'Not Interested',
-  sold:           'Sold',
+  new: 'New', called: 'Called', callback: 'Callback',
+  not_interested: 'Not Interested', sold: 'Inspection Set',
+}
+
+function formatDuration(s: number) {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 export default function SpeedDial() {
@@ -49,16 +81,64 @@ export default function SpeedDial() {
   const [filter, setFilter]             = useState<Filter>('all')
   const [loadingTargets, setLoadingTargets] = useState(false)
   const [saving, setSaving]             = useState(false)
-  const [pendingOutcome, setPendingOutcome] = useState<'callback' | 'sold' | null>(null)
-  const [noteText, setNoteText]         = useState('')
-  const [calling, setCalling]           = useState<{ phone: string; name: string } | null>(null)
   const [showListDrop, setShowListDrop] = useState(false)
 
-  const listDropRef   = useRef<HTMLDivElement>(null)
-  const activeItemRef = useRef<HTMLButtonElement | null>(null)
+  // Outcome modal
+  const [showOutcomeModal, setShowOutcomeModal] = useState(false)
+  const [outcomeSelection, setOutcomeSelection] = useState<OutcomeOption | null>(null)
+  const [outcomeNote, setOutcomeNote]           = useState('')
+
+  // Dialer
+  const [twilioReady, setTwilioReady]     = useState(false)
+  const [dialerPhone, setDialerPhone]     = useState<string | null>(null)
+  const [dialerContact, setDialerContact] = useState<string | null>(null)
+  const [callState, setCallState]         = useState<CallState>('idle')
+  const [callSeconds, setCallSeconds]     = useState(0)
+  const [autoDialing, setAutoDialing]     = useState(false)
+
+  // Transcript (wired to Twilio when connected)
+  const [transcript, setTranscript] = useState<Utterance[]>([])
+
+  const listDropRef      = useRef<HTMLDivElement>(null)
+  const activeItemRef    = useRef<HTMLButtonElement | null>(null)
+  const activePhoneRef   = useRef<HTMLDivElement | null>(null)
+  const transcriptEndRef = useRef<HTMLDivElement>(null)
+  const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null)
+  const deviceRef        = useRef<Device | null>(null)
+  const activeCallRef    = useRef<Call | null>(null)
 
   useEffect(() => {
     base44.entities.CallList.list().then((d: any) => setLists(d)).catch(console.error)
+  }, [])
+
+  // Initialize Twilio Device
+  useEffect(() => {
+    const tokenUrl = import.meta.env.VITE_TWILIO_TOKEN_URL
+    if (!tokenUrl) return
+
+    let device: Device
+
+    async function setup() {
+      try {
+        const res = await fetch(tokenUrl)
+        if (!res.ok) throw new Error(`Token fetch failed: ${res.status}`)
+        const { token } = await res.json()
+
+        device = new Device(token, { logLevel: 'silent' as any })
+        deviceRef.current = device
+
+        device.on('registered',   () => { console.log('Twilio: registered'); setTwilioReady(true) })
+        device.on('unregistered', () => setTwilioReady(false))
+        device.on('error',        (err) => { console.error('Twilio:', err); setTwilioReady(false) })
+
+        await device.register()
+      } catch (err) {
+        console.error('Twilio setup failed:', err)
+      }
+    }
+
+    setup()
+    return () => { device?.destroy() }
   }, [])
 
   useEffect(() => {
@@ -66,6 +146,7 @@ export default function SpeedDial() {
     setLoadingTargets(true)
     setActiveId(null)
     setTargets([])
+    setAutoDialing(false)
     base44.entities.Target.filter({ list_id: activeListId })
       .then((d: any) => {
         setTargets(d)
@@ -89,12 +170,28 @@ export default function SpeedDial() {
     activeItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [activeId])
 
+  useEffect(() => {
+    activePhoneRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [dialerPhone])
+
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [transcript])
+
+  useEffect(() => {
+    if (callState === 'active') {
+      setCallSeconds(0)
+      timerRef.current = setInterval(() => setCallSeconds(s => s + 1), 1000)
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [callState])
+
   const activeTarget = targets.find(t => t.id === activeId) ?? null
   const activeList   = lists.find(l => l.id === activeListId)
 
-  const visibleTargets = filter === 'all'
-    ? targets
-    : targets.filter(t => t.status === filter)
+  const visibleTargets = filter === 'all' ? targets : targets.filter(t => t.status === filter)
 
   const stats = {
     total:    targets.length,
@@ -109,28 +206,94 @@ export default function SpeedDial() {
     return pool.find(t => t.status === 'new' || t.status === 'callback') ?? null
   }
 
-  async function logOutcome(status: Target['status'], note: string) {
+  function resetCall() {
+    setCallState('idle')
+    setCallSeconds(0)
+  }
+
+  function onCallDisconnected() {
+    activeCallRef.current = null
+    resetCall()
+    setOutcomeSelection(null)
+    setOutcomeNote('')
+    setShowOutcomeModal(true)
+  }
+
+  async function initiateCall(phone: string, contactName: string) {
+    if (!twilioReady || !deviceRef.current) return
+    setDialerPhone(phone)
+    setDialerContact(contactName)
+    setTranscript([])
+    try {
+      const call = await deviceRef.current.connect({ params: { To: phone } })
+      activeCallRef.current = call
+      setCallState('active')
+      call.on('disconnect', onCallDisconnected)
+      call.on('error', (err: unknown) => { console.error('Call error:', err); onCallDisconnected() })
+    } catch (err) {
+      console.error('Failed to connect:', err)
+    }
+  }
+
+  function hangUp() {
+    if (activeCallRef.current) {
+      activeCallRef.current.disconnect()
+      // onCallDisconnected fires via the 'disconnect' event on the call
+    } else {
+      onCallDisconnected()
+    }
+  }
+
+  function loadDialer(phone: string, contactName: string) {
+    if (callState === 'active') resetCall()
+    setDialerPhone(phone)
+    setDialerContact(contactName)
+  }
+
+  function startAutoDialing() {
+    setAutoDialing(true)
+    const phone = activeTarget?.contacts?.[0]?.phones?.[0]
+    const name  = activeTarget?.contacts?.[0]?.name ?? ''
+    if (phone) initiateCall(phone, name)
+  }
+
+  function stopAutoDialing() {
+    setAutoDialing(false)
+    if (callState === 'active') {
+      hangUp()
+    } else {
+      resetCall()
+    }
+  }
+
+  async function logOutcome(outcome: OutcomeOption) {
     if (!activeId) return
-    const id = activeId
+    const id     = activeId
+    const status = OUTCOME_TO_STATUS[outcome]
+    const note   = outcomeNote.trim()
+      ? `${OUTCOME_LABEL[outcome]} — ${outcomeNote.trim()}`
+      : OUTCOME_LABEL[outcome]
+
     setSaving(true)
     try {
-      await base44.entities.Target.update(id, { status, ...(note ? { notes: note } : {}) })
-      setTargets(prev => prev.map(t => t.id === id ? { ...t, status, notes: note || t.notes } : t))
+      await base44.entities.Target.update(id, { status, notes: note })
+      setTargets(prev => prev.map(t => t.id === id ? { ...t, status, notes: note } : t))
       const next = findNext(id)
       setActiveId(next?.id ?? null)
-      setPendingOutcome(null)
-      setNoteText('')
-      setCalling(null)
+      setShowOutcomeModal(false)
+      setOutcomeSelection(null)
+      setOutcomeNote('')
+
+      if (autoDialing && next) {
+        const phone = next.contacts?.[0]?.phones?.[0]
+        const name  = next.contacts?.[0]?.name ?? ''
+        if (phone) setTimeout(() => initiateCall(phone, name), 400)
+      }
     } catch (e) {
       console.error(e)
     } finally {
       setSaving(false)
     }
-  }
-
-  function handleCall(phone: string, name: string) {
-    setCalling({ phone, name })
-    window.open(`tel:${phone.replace(/[^\d+]/g, '')}`)
   }
 
   function stepTarget(dir: 1 | -1) {
@@ -139,8 +302,73 @@ export default function SpeedDial() {
     if (next) setActiveId(next.id)
   }
 
+  const canStartDialing = !!activeTarget && !loadingTargets && twilioReady
+
   return (
     <div className={styles.page}>
+
+      {/* ── Outcome modal — blocks until logged ─────────────────────── */}
+      <AnimatePresence>
+        {showOutcomeModal && (
+          <motion.div
+            className={styles.modalOverlay}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <motion.div
+              className={styles.modalPanel}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 8 }}
+              transition={{ duration: 0.22, ease: EASE }}
+            >
+              <div className={styles.modalHeader}>
+                <span className={styles.modalTitle}>Log Outcome</span>
+                {(dialerContact || dialerPhone) && (
+                  <span className={styles.modalContext}>
+                    {[dialerContact, dialerPhone].filter(Boolean).join('  ·  ')}
+                  </span>
+                )}
+              </div>
+
+              <div className={styles.outcomeGrid}>
+                {(Object.keys(OUTCOME_LABEL) as OutcomeOption[]).map(opt => (
+                  <button
+                    key={opt}
+                    className={[
+                      styles.outcomeOption,
+                      outcomeSelection === opt ? styles.outcomeOptionSelected : '',
+                    ].join(' ')}
+                    onClick={() => setOutcomeSelection(opt)}
+                  >
+                    {OUTCOME_LABEL[opt]}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                className={styles.modalNotes}
+                placeholder="Notes (optional)…"
+                rows={3}
+                value={outcomeNote}
+                onChange={e => setOutcomeNote(e.target.value)}
+              />
+
+              <div className={styles.modalFooter}>
+                <button
+                  className={styles.modalSubmit}
+                  disabled={!outcomeSelection || saving}
+                  onClick={() => outcomeSelection && logOutcome(outcomeSelection)}
+                >
+                  {saving ? 'Saving…' : 'Log & Continue'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Top bar ─────────────────────────────────────────────────── */}
       <motion.div
@@ -183,42 +411,40 @@ export default function SpeedDial() {
               )}
             </AnimatePresence>
           </div>
+
+          <AnimatePresence>
+            {activeListId && !loadingTargets && (
+              <motion.div className={styles.statRow}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}
+              >
+                <span className={styles.stat}><span className={styles.statNum}>{stats.total}</span> total</span>
+                <span className={styles.statDiv} />
+                <span className={styles.stat}><span className={styles.statNum}>{stats.new}</span> new</span>
+                <span className={styles.statDiv} />
+                <span className={styles.stat}><span className={styles.statNum}>{stats.callback}</span> callback</span>
+                <span className={styles.statDiv} />
+                <span className={styles.stat}><span className={styles.statNum}>{stats.sold}</span> inspections</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <AnimatePresence>
-          {activeListId && !loadingTargets && (
-            <motion.div
-              className={styles.statRow}
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              transition={{ duration: 0.4 }}
-            >
-              <span className={styles.stat}><span className={styles.statNum}>{stats.total}</span> total</span>
-              <span className={styles.statDiv} />
-              <span className={styles.stat}><span className={styles.statNum}>{stats.new}</span> new</span>
-              <span className={styles.statDiv} />
-              <span className={styles.stat}><span className={styles.statNum}>{stats.callback}</span> callback</span>
-              <span className={styles.statDiv} />
-              <span className={styles.stat}><span className={styles.statNum}>{stats.sold}</span> sold</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {calling && (
-            <motion.div
-              className={styles.inCallBadge}
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <span className={styles.inCallDot} />
-              In call · {calling.name}
-              <button className={styles.inCallEnd} onClick={() => setCalling(null)}>✕</button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {autoDialing ? (
+          <button className={styles.stopBtn} onClick={stopAutoDialing}>
+            Stop Dialing
+          </button>
+        ) : (
+          <button
+            className={styles.startBtn}
+            disabled={!canStartDialing}
+            onClick={startAutoDialing}
+          >
+            Start Dialing
+          </button>
+        )}
       </motion.div>
 
-      {/* ── Body (queue + workspace) ────────────────────────────────── */}
+      {/* ── Body ────────────────────────────────────────────────────── */}
       <div className={styles.body}>
 
         {/* Queue */}
@@ -241,7 +467,6 @@ export default function SpeedDial() {
               ))}
             </div>
           </div>
-
           <div className={styles.queueList}>
             {loadingTargets && <div className={styles.queueEmpty}>Loading…</div>}
             {!loadingTargets && !activeListId && <div className={styles.queueEmpty}>Select a list above</div>}
@@ -255,8 +480,7 @@ export default function SpeedDial() {
                 className={[
                   styles.queueItem,
                   t.id === activeId ? styles.queueItemActive : '',
-                  (t.status === 'not_interested' || t.status === 'sold' || t.status === 'called')
-                    ? styles.queueItemDone : '',
+                  ['not_interested', 'sold', 'called'].includes(t.status) ? styles.queueItemDone : '',
                 ].join(' ')}
                 onClick={() => setActiveId(t.id)}
               >
@@ -276,147 +500,185 @@ export default function SpeedDial() {
           animate={{ opacity: 1, filter: 'blur(0px)' }}
           transition={{ delay: 0.15, duration: 0.6, ease: EASE }}
         >
-          <AnimatePresence mode="wait">
-            {!activeListId ? (
-              <motion.div key="no-list" className={styles.emptyState}
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              >
-                Select a list to start calling
-              </motion.div>
-            ) : loadingTargets ? (
-              <motion.div key="loading" className={styles.emptyState}
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              >
-                Loading…
-              </motion.div>
-            ) : !activeTarget ? (
-              <motion.div key="done" className={styles.emptyState}
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              >
-                All targets worked — {stats.sold} sold
-              </motion.div>
-            ) : (
-              <motion.div
-                key={activeTarget.id}
-                className={styles.target}
-                initial={{ opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                transition={{ duration: 0.3, ease: EASE }}
-              >
-                {/* Address */}
-                <div className={styles.targetHead}>
-                  <div>
-                    <div className={styles.address}>{activeTarget.line1}</div>
-                    {activeTarget.line2 && (
-                      <div className={styles.addressSub}>{activeTarget.line2}</div>
-                    )}
-                  </div>
-                  <div className={styles.headRight}>
-                    <span className={styles.statusLabel}>{STATUS_LABEL[activeTarget.status]}</span>
-                    <div className={styles.navBtns}>
-                      <button className={styles.navBtn} onClick={() => stepTarget(-1)}>← Prev</button>
-                      <button className={styles.navBtn} onClick={() => stepTarget(1)}>Next →</button>
+
+          {/* Target info */}
+          <div className={styles.targetInfo}>
+            <AnimatePresence mode="wait">
+              {!activeListId ? (
+                <motion.div key="no-list" className={styles.emptyState}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  Select a list to start calling
+                </motion.div>
+              ) : loadingTargets ? (
+                <motion.div key="loading" className={styles.emptyState}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  Loading…
+                </motion.div>
+              ) : !activeTarget ? (
+                <motion.div key="done" className={styles.emptyState}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  All targets worked — {stats.sold} inspections set
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={activeTarget.id}
+                  className={styles.target}
+                  initial={{ opacity: 0, x: 16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.3, ease: EASE }}
+                >
+                  <div className={styles.targetHead}>
+                    <div>
+                      <div className={styles.address}>{activeTarget.line1}</div>
+                      {activeTarget.line2 && <div className={styles.addressSub}>{activeTarget.line2}</div>}
+                    </div>
+                    <div className={styles.headRight}>
+                      <span className={styles.statusLabel}>{STATUS_LABEL[activeTarget.status]}</span>
+                      <div className={styles.navBtns}>
+                        <button className={styles.navBtn} onClick={() => stepTarget(-1)}>← Prev</button>
+                        <button className={styles.navBtn} onClick={() => stepTarget(1)}>Next →</button>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Property meta */}
-                {(activeTarget.property_type || activeTarget.year_built) && (
-                  <div className={styles.propMeta}>
-                    {[
-                      activeTarget.property_type,
-                      activeTarget.property_subtype,
-                      activeTarget.year_built ? `Built ${activeTarget.year_built}` : null,
-                    ].filter(Boolean).join('  ·  ')}
-                  </div>
-                )}
-
-                {/* Contacts */}
-                <div className={styles.contacts}>
-                  {(!activeTarget.contacts || activeTarget.contacts.length === 0) ? (
-                    <p className={styles.noContacts}>No contact data</p>
-                  ) : (
-                    activeTarget.contacts.map((c, i) => (
-                      <div key={i} className={styles.contact}>
-                        <div className={styles.contactName}>{c.name}</div>
-                        {(c.title || c.company) && (
-                          <div className={styles.contactRole}>
-                            {[c.title, c.company].filter(Boolean).join(' · ')}
-                          </div>
-                        )}
-                        {c.phones.map((p, j) => (
-                          <div key={j} className={styles.phoneRow}>
-                            <span className={styles.phone}>{p}</span>
-                            <button className={styles.callBtn} onClick={() => handleCall(p, c.name)}>
-                              Call
-                            </button>
-                          </div>
-                        ))}
-                        {c.emails.length > 0 && (
-                          <div className={styles.emailRow}>
-                            {c.emails.join('  ·  ')}
-                          </div>
-                        )}
-                      </div>
-                    ))
+                  {(activeTarget.property_type || activeTarget.year_built) && (
+                    <div className={styles.propMeta}>
+                      {[
+                        activeTarget.property_type,
+                        activeTarget.property_subtype,
+                        activeTarget.year_built ? `Built ${activeTarget.year_built}` : null,
+                      ].filter(Boolean).join('  ·  ')}
+                    </div>
                   )}
-                </div>
 
-                {/* Outcome */}
-                <div className={styles.outcome}>
-                  <AnimatePresence mode="wait">
-                    {pendingOutcome ? (
-                      <motion.div key="notes" className={styles.notesBox}
-                        initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: EASE }}
-                      >
-                        <span className={styles.notesLabel}>
-                          {pendingOutcome === 'sold' ? 'Confirm sale' : 'Schedule callback'} — add a note
-                        </span>
-                        <textarea
-                          className={styles.notesInput}
-                          placeholder="Optional notes…"
-                          rows={2}
-                          value={noteText}
-                          onChange={e => setNoteText(e.target.value)}
-                          autoFocus
-                        />
-                        <div className={styles.notesActions}>
-                          <button className={styles.cancelBtn}
-                            onClick={() => { setPendingOutcome(null); setNoteText('') }}>
-                            Cancel
-                          </button>
-                          <button className={styles.confirmBtn} disabled={saving}
-                            onClick={() => logOutcome(pendingOutcome, noteText)}>
-                            {saving ? 'Saving…'
-                              : pendingOutcome === 'sold' ? 'Confirm Sale'
-                              : 'Log Callback'}
-                          </button>
-                        </div>
-                      </motion.div>
+                  <div className={styles.contacts}>
+                    {(!activeTarget.contacts || activeTarget.contacts.length === 0) ? (
+                      <p className={styles.noContacts}>No contact data</p>
                     ) : (
-                      <motion.div key="btns" className={styles.outcomeBtns}
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
-                      >
-                        <button className={styles.outcomeBtn} disabled={saving}
-                          onClick={() => logOutcome('called', 'No answer')}>No Answer</button>
-                        <button className={styles.outcomeBtn} disabled={saving}
-                          onClick={() => logOutcome('called', 'Left voicemail')}>Voicemail</button>
-                        <button className={styles.outcomeBtn} disabled={saving}
-                          onClick={() => setPendingOutcome('callback')}>Callback</button>
-                        <button className={styles.outcomeBtn} disabled={saving}
-                          onClick={() => logOutcome('not_interested', '')}>Not Interested</button>
-                        <button className={`${styles.outcomeBtn} ${styles.outcomeSold}`} disabled={saving}
-                          onClick={() => setPendingOutcome('sold')}>Sold</button>
-                      </motion.div>
+                      activeTarget.contacts.map((c, i) => (
+                        <div key={i} className={styles.contact}>
+                          <div className={styles.contactName}>{c.name}</div>
+                          {(c.title || c.company) && (
+                            <div className={styles.contactRole}>
+                              {[c.title, c.company].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
+                          {c.phones.map((p, j) => {
+                            const isActive = dialerPhone === p
+                            return (
+                              <div
+                                key={j}
+                                ref={isActive ? activePhoneRef : null}
+                                className={`${styles.phoneRow} ${isActive ? styles.phoneRowActive : ''}`}
+                              >
+                                <span className={`${styles.phone} ${isActive ? styles.phoneActive : ''}`}>{p}</span>
+                                <button
+                                  className={`${styles.dialLoadBtn} ${isActive ? styles.dialLoadBtnActive : ''}`}
+                                  onClick={() => loadDialer(p, c.name)}
+                                >
+                                  {isActive ? 'Loaded' : 'Dial'}
+                                </button>
+                              </div>
+                            )
+                          })}
+                          {c.emails.length > 0 && (
+                            <div className={styles.emailRow}>{c.emails.join('  ·  ')}</div>
+                          )}
+                        </div>
+                      ))
                     )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  </div>
+
+                  {activeTarget.notes && (
+                    <div className={styles.prevNote}>
+                      <span className={styles.prevNoteLabel}>Last note</span>
+                      <span className={styles.prevNoteText}>{activeTarget.notes}</span>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* ── Right panel: dialer + transcript ──────────────────── */}
+          <div className={styles.rightPanel}>
+
+            {/* Dialer */}
+            <div className={styles.dialerSection}>
+              <div className={styles.panelLabel}>Dialer</div>
+              <div className={styles.dialerBody}>
+                <AnimatePresence mode="wait">
+                  {callState === 'active' ? (
+                    <motion.div key="active" className={styles.dialerActive}
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                    >
+                      <span className={styles.dialerStatusTag}>In call</span>
+                      <span className={styles.dialerTimer}>{formatDuration(callSeconds)}</span>
+                      <span className={styles.dialerActiveNum}>{dialerPhone}</span>
+                      {dialerContact && <span className={styles.dialerActiveName}>{dialerContact}</span>}
+                      <button className={styles.hangUpBtn} onClick={hangUp}>End Call</button>
+                    </motion.div>
+                  ) : dialerPhone ? (
+                    <motion.div key="loaded" className={styles.dialerLoaded}
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                    >
+                      <span className={styles.dialerNum}>{dialerPhone}</span>
+                      {dialerContact && <span className={styles.dialerName}>{dialerContact}</span>}
+                      <button className={styles.callBtn}
+                        disabled={!twilioReady}
+                        onClick={() => dialerPhone && dialerContact && initiateCall(dialerPhone, dialerContact)}>
+                        {twilioReady ? 'Call' : 'Not Connected'}
+                      </button>
+                      <button className={styles.dialerClear}
+                        onClick={() => { setDialerPhone(null); setDialerContact(null) }}>
+                        Clear
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div key="idle" className={styles.dialerIdle}
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                    >
+                      <span className={styles.dialerIdleText}>
+                        {autoDialing ? 'Starting…' : 'Click Dial next to a number'}
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              <div className={styles.dialerFooter}>
+                <span className={twilioReady ? styles.twilioStatusOk : styles.twilioStatus}>
+                  {twilioReady ? 'Twilio — connected' : 'Twilio — not connected'}
+                </span>
+              </div>
+            </div>
+
+            {/* Transcript */}
+            <div className={styles.transcriptSection}>
+              <div className={styles.panelLabel}>Live Transcript</div>
+              <div className={styles.transcriptBody}>
+                {transcript.length === 0 ? (
+                  <span className={styles.transcriptEmpty}>
+                    {callState === 'active'
+                      ? 'Waiting for speech…'
+                      : 'Transcript appears here during calls'}
+                  </span>
+                ) : (
+                  transcript.map((u, i) => (
+                    <div key={i} className={`${styles.utterance} ${u.speaker === 'agent' ? styles.utteranceAgent : ''}`}>
+                      <span className={styles.utteranceLabel}>{u.speaker === 'agent' ? 'You' : 'Contact'}</span>
+                      <span className={styles.utteranceText}>{u.text}</span>
+                    </div>
+                  ))
+                )}
+                <div ref={transcriptEndRef} />
+              </div>
+            </div>
+
+          </div>
         </motion.div>
       </div>
     </div>
