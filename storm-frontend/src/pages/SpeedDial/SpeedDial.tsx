@@ -127,7 +127,7 @@ export default function SpeedDial() {
         device = new Device(token, { logLevel: 'silent' as any })
         deviceRef.current = device
 
-        device.on('registered',   () => { console.log('Twilio: registered'); setTwilioReady(true) })
+        device.on('registered',   () => setTwilioReady(true))
         device.on('unregistered', () => setTwilioReady(false))
         device.on('error',        (err) => { console.error('Twilio:', err); setTwilioReady(false) })
 
