@@ -207,6 +207,7 @@
   gap: 8px;
   overflow-y: auto;
   scrollbar-width: none;
+  min-height: 0;
 }
 
 .sidebar::-webkit-scrollbar { display: none; }
@@ -289,22 +290,77 @@
 }
 
 /* ── List management ─────────────────────────── */
-.listSelect {
+.listTrigger {
   width: 100%;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  padding: 3px 0;
   font-family: inherit;
-  font-size: 0.8125rem;
-  padding: 7px 10px;
-  outline: none;
   cursor: pointer;
-  transition: border-color 0.2s;
+  text-align: left;
 }
 
-.listSelect:focus { border-color: var(--surface-border-strong); }
-.listSelect option { background: var(--surface); }
+.listTriggerValue {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.listTriggerPlaceholder {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.listChevron {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.listChevronOpen { transform: rotate(180deg); }
+
+.listDropdown {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid var(--surface-border);
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.listOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 6px 4px;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.listOption:hover { color: var(--text-primary); background: rgba(255,255,255,0.04); }
+
+.listOptionActive { color: var(--text-primary); }
+
+.listOptionDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
 
 .newListBtn {
   background: none;

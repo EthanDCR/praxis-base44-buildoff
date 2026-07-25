@@ -153,6 +153,7 @@ export default function HailMap() {
   const [showNewList, setShowNewList]         = useState(false)
   const [newListName, setNewListName]         = useState('')
   const [creatingList, setCreatingList]       = useState(false)
+  const [showDropdown, setShowDropdown]       = useState(false)
   const [addingTarget, setAddingTarget]       = useState(false)
   const [addedFeedback, setAddedFeedback]     = useState(false)
   const [hoveredSwath, setHoveredSwath]       = useState<{
@@ -400,21 +401,44 @@ export default function HailMap() {
             </div>
           ) : (
             <>
-              {lists.length > 0 ? (
-                <select
-                  className={styles.listSelect}
-                  value={activeListId ?? ''}
-                  onChange={e => setActiveListId(e.target.value || null)}
-                >
-                  <option value="">Select a list…</option>
-                  {lists.map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-              ) : (
-                <p className={styles.noSelection}>No lists yet</p>
-              )}
-              <button className={styles.newListBtn} onClick={() => setShowNewList(true)}>+ New list</button>
+              <button
+                className={styles.listTrigger}
+                onClick={() => lists.length > 0 && setShowDropdown(d => !d)}
+              >
+                <span className={activeListId ? styles.listTriggerValue : styles.listTriggerPlaceholder}>
+                  {activeListId ? (lists.find(l => l.id === activeListId)?.name ?? 'Select a list…') : lists.length > 0 ? 'Select a list…' : 'No lists yet'}
+                </span>
+                {lists.length > 0 && (
+                  <span className={`${styles.listChevron} ${showDropdown ? styles.listChevronOpen : ''}`}>▾</span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {showDropdown && (
+                  <motion.div
+                    className={styles.listDropdown}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2, ease: EASE }}
+                  >
+                    {lists.map(l => (
+                      <button
+                        key={l.id}
+                        className={`${styles.listOption} ${l.id === activeListId ? styles.listOptionActive : ''}`}
+                        onClick={() => { setActiveListId(l.id); setShowDropdown(false) }}
+                      >
+                        {l.name}
+                        {l.id === activeListId && <span className={styles.listOptionDot} />}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button className={styles.newListBtn} onClick={() => { setShowDropdown(false); setShowNewList(true) }}>
+                + New list
+              </button>
             </>
           )}
         </SidebarSection>

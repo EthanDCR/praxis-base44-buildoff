@@ -12,7 +12,7 @@
     },
     "line2": {
       "type": "string",
-      "description": "City, State"
+      "description": "City, State ZIP"
     },
     "lat": {
       "type": "number",
@@ -24,12 +24,38 @@
     },
     "hail_size": {
       "type": "number",
-      "description": "Hail size in inches at this location at time of storm"
+      "description": "Hail size in inches at this location"
     },
     "hail_date": {
       "type": "string",
       "format": "date-time",
       "description": "Date of the hail event"
+    },
+    "property_type": {
+      "type": "string",
+      "description": "Property type from Reonomy (e.g. Retail, Industrial, Multifamily)"
+    },
+    "property_subtype": {
+      "type": "string",
+      "description": "Property subtype from Reonomy"
+    },
+    "year_built": {
+      "type": "string",
+      "description": "Year the building was constructed"
+    },
+    "contacts": {
+      "type": "array",
+      "description": "Owner/contact records from Reonomy — up to 3 per property",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name":    { "type": "string" },
+          "company": { "type": "string" },
+          "title":   { "type": "string" },
+          "phones":  { "type": "array", "items": { "type": "string" } },
+          "emails":  { "type": "array", "items": { "type": "string" } }
+        }
+      }
     },
     "status": {
       "type": "string",
