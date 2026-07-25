@@ -9,7 +9,8 @@ import styles from './HailMap.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 const US_BOUNDS: LatLngBoundsExpression = [[15, -135], [58, -55]]
-const SWDI_BASE = 'https://www.ncei.noaa.gov/swdiws/json/nx3hail'
+const SWDI_BASE   = 'https://www.ncei.noaa.gov/swdiws/json/nx3hail'
+const IEM_BASE    = 'https://mesonet.agron.iastate.edu/geojson/lsr.php'
 const MIN_ZOOM_TO_FETCH = 7
 
 const TILES = {
@@ -32,18 +33,34 @@ const TILES = {
 // ---------------------------------------------------------------------------
 
 interface SwdiRecord {
-  SHAPE:   string  // "POINT (lon lat)"
-  MAXSIZE: string  // hail size in inches
-  PROB:    string  // probability of hail 0-100
-  SEVPROB: string  // probability of severe hail 0-100
-  ZTIME:   string  // ISO-8601 UTC
-  WSR_ID:  string  // radar station ID
+  SHAPE:   string
+  MAXSIZE: string
+  PROB:    string
+  SEVPROB: string
+  ZTIME:   string
+  WSR_ID:  string
   CELL_ID: string
 }
 
-interface HoverInfo {
-  record: SwdiRecord
+interface IemFeature {
+  type: 'Feature'
+  geometry: { type: 'Point'; coordinates: [number, number] }
+  properties: { magnitude: number; valid: string; city: string; county: string; state: string; remark: string }
 }
+
+// Unified pool entry used for heatmap + hover
+interface PoolEntry {
+  lat:      number
+  lon:      number
+  size:     number   // hail size in inches
+  time:     string   // ISO-8601
+  source:   'swdi' | 'iem'
+  sevprob?: number   // swdi only
+  radar?:   string   // swdi only
+  label?:   string   // iem only
+}
+
+type HoverInfo = { entry: PoolEntry }
 
 interface ViewState {
   north: number
@@ -72,11 +89,49 @@ function swdiDate(d: Date) {
   return d.toISOString().slice(0, 10).replace(/-/g, '')
 }
 
-function buildUrl(days: number, view: ViewState) {
+function iemDate(d: Date) {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}`
+}
+
+function buildSwdiUrl(days: number, view: ViewState) {
   const now   = new Date()
   const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
   const bbox  = `${view.west.toFixed(3)},${view.south.toFixed(3)},${view.east.toFixed(3)},${view.north.toFixed(3)}`
   return `${SWDI_BASE}/${swdiDate(start)}:${swdiDate(now)}?bbox=${bbox}`
+}
+
+function buildIemUrl(days: number) {
+  const now   = new Date()
+  const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+  return `${IEM_BASE}?sts=${iemDate(start)}&ets=${iemDate(now)}&type=H`
+}
+
+// IEM magnitudes are sometimes encoded as hundredths (75 → 0.75"). Cap at 2.5" to suppress bad reports.
+function normalizeIemSize(raw: number): number {
+  const n = raw > 10 ? raw / 100 : raw
+  return Math.min(n, 2.5)
+}
+
+function iemToEntry(f: IemFeature): PoolEntry | null {
+  const [lon, lat] = f.geometry.coordinates
+  const size = normalizeIemSize(f.properties.magnitude ?? 0)
+  if (!size) return null
+  const { valid, city, county, state } = f.properties
+  return { lat, lon, size, time: valid, source: 'iem', label: [city, county, state].filter(Boolean).join(', ') }
+}
+
+function swdiToEntry(r: SwdiRecord): PoolEntry | null {
+  const coord = parsePoint(r.SHAPE)
+  if (!coord) return null
+  return {
+    lat: coord[0], lon: coord[1],
+    size: parseFloat(r.MAXSIZE),
+    time: r.ZTIME,
+    source: 'swdi',
+    sevprob: parseInt(r.SEVPROB),
+    radar: r.WSR_ID,
+  }
 }
 
 function formatDate(ztime: string) {
@@ -123,22 +178,19 @@ function MapClickHandler({ onAddress }: { onAddress: (addr: SelectedAddress) => 
   return null
 }
 
-function HoverTracker({ pool, onHover }: { pool: SwdiRecord[]; onHover: (info: HoverInfo | null) => void }) {
+function HoverTracker({ pool, onHover }: { pool: PoolEntry[]; onHover: (info: HoverInfo | null) => void }) {
   const map = useMap()
 
   useMapEvent('mousemove', (e) => {
     if (pool.length === 0) { onHover(null); return }
-    // Threshold scales with zoom: ~40km at z7, ~5km at z10, ~0.6km at z13
     const thresholdM = 40000 / Math.pow(2, map.getZoom() - 7)
-    let nearest: SwdiRecord | null = null
+    let nearest: PoolEntry | null = null
     let minDist = thresholdM
-    for (const r of pool) {
-      const coord = parsePoint(r.SHAPE)
-      if (!coord) continue
-      const dist = e.latlng.distanceTo(coord)
-      if (dist < minDist) { minDist = dist; nearest = r }
+    for (const entry of pool) {
+      const dist = e.latlng.distanceTo([entry.lat, entry.lon])
+      if (dist < minDist) { minDist = dist; nearest = entry }
     }
-    onHover(nearest ? { record: nearest } : null)
+    onHover(nearest ? { entry: nearest } : null)
   })
 
   useMapEvent('mouseout', () => onHover(null))
@@ -177,8 +229,9 @@ function SidebarSection({ children, delay }: { children: React.ReactNode; delay:
 }
 
 export default function HailMap() {
-  const [records, setRecords]           = useState<SwdiRecord[]>([])
-  const [loading, setLoading]           = useState(false)
+  const [iemReports, setIemReports]     = useState<IemFeature[]>([])
+  const [swdiRecords, setSwdiRecords]   = useState<SwdiRecord[]>([])
+  const [loading, setLoading]           = useState(true)
   const [error, setError]               = useState<string | null>(null)
   const [rangeDays, setRangeDays]       = useState(7)
   const [viewState, setViewState]       = useState<ViewState | null>(null)
@@ -203,26 +256,39 @@ export default function HailMap() {
 
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Fetch SWDI data whenever viewport or date range changes
+  // IEM nationwide overview — re-fetch when date range changes
   useEffect(() => {
-    if (!viewState || viewState.zoom < MIN_ZOOM_TO_FETCH) return
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetch(buildIemUrl(rangeDays))
+      .then(r => { if (!r.ok) throw new Error(`IEM ${r.status}`); return r.json() })
+      .then(json => { if (!cancelled) setIemReports(json.features ?? []) })
+      .catch(e => { if (!cancelled) setError(e.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [rangeDays])
 
+  // SWDI radar — fetch viewport when zoomed in
+  useEffect(() => {
+    if (!viewState || viewState.zoom < MIN_ZOOM_TO_FETCH) {
+      setSwdiRecords([])
+      return
+    }
     if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
     fetchTimerRef.current = setTimeout(async () => {
       setLoading(true)
-      setError(null)
       try {
-        const res  = await fetch(buildUrl(rangeDays, viewState))
+        const res  = await fetch(buildSwdiUrl(rangeDays, viewState))
         if (!res.ok) throw new Error(`SWDI ${res.status}`)
         const data = await res.json()
-        setRecords(data.result ?? [])
+        setSwdiRecords(data.result ?? [])
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load data')
+        setError(e instanceof Error ? e.message : 'Failed to load radar data')
       } finally {
         setLoading(false)
       }
     }, 400)
-
     return () => { if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current) }
   }, [rangeDays, viewState])
 
@@ -318,23 +384,20 @@ export default function HailMap() {
 
   const handleView = useCallback((v: ViewState) => setViewState(v), [])
 
-  const pool = records.filter(r => parseFloat(r.MAXSIZE) >= minSize)
+  const isHighZoom = viewState !== null && viewState.zoom >= MIN_ZOOM_TO_FETCH
 
-  const heatPoints = pool
-    .map(r => {
-      const coord = parsePoint(r.SHAPE)
-      if (!coord) return null
-      const size      = parseFloat(r.MAXSIZE)
-      const intensity = Math.min((size - 0.5) / 2.5, 1.0)
-      return [coord[0], coord[1], intensity] as [number, number, number]
-    })
-    .filter((p): p is [number, number, number] => p !== null)
+  // Build unified pool — use SWDI when zoomed in AND data has arrived, else IEM as fallback
+  const pool: PoolEntry[] = (isHighZoom && swdiRecords.length > 0)
+    ? swdiRecords.map(swdiToEntry).filter((e): e is PoolEntry => e !== null && e.size >= minSize)
+    : iemReports.map(iemToEntry).filter((e): e is PoolEntry => e !== null && e.size >= minSize)
 
-  const maxSize = pool.length > 0
-    ? Math.max(...pool.map(r => parseFloat(r.MAXSIZE)))
-    : 0
+  const heatPoints = pool.map<[number, number, number]>(e => [
+    e.lat, e.lon, Math.min((e.size - 0.5) / 2.5, 1.0),
+  ])
 
-  const needsZoomIn = viewState !== null && viewState.zoom < MIN_ZOOM_TO_FETCH
+  const maxSize = pool.length > 0 ? Math.max(...pool.map(e => e.size)) : 0
+
+  const needsZoomIn = false // always show something — IEM at low zoom, SWDI at high
 
   return (
     <div className={styles.page}>
@@ -349,14 +412,23 @@ export default function HailMap() {
         <div className={styles.topBarLeft}>
           <span className={styles.pageTitle}>Storm Map</span>
           {needsZoomIn && <span className={`${styles.badge} ${styles.badgeLoading}`}>Zoom in to load</span>}
-          {!needsZoomIn && loading && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
-          {!needsZoomIn && !loading && !error && <span className={`${styles.badge} ${styles.badgeLive}`}>● Live</span>}
+          {loading && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
+          {!loading && !error && (
+            <span className={`${styles.badge} ${styles.badgeLive}`}>
+              ● {isHighZoom && swdiRecords.length > 0 ? 'Radar' : 'Overview'}
+            </span>
+          )}
           {error && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {error}</span>}
-          {!needsZoomIn && !loading && !error && pool.length > 0 && (
+          {!loading && !error && pool.length > 0 && (
             <span className={styles.strikeCount}>
               <span className={styles.strikeNum}>{pool.length.toLocaleString()}</span>
-              <span className={styles.strikeSub}>signatures · last {rangeDays}d · max {maxSize}"</span>
+              <span className={styles.strikeSub}>
+                {isHighZoom ? 'radar sigs' : 'reports'} · last {rangeDays}d · max {maxSize.toFixed(2)}"
+              </span>
             </span>
+          )}
+          {!isHighZoom && !loading && (
+            <span className={styles.strikeSub} style={{ marginLeft: 8 }}>Zoom in for radar precision</span>
           )}
         </div>
         <div className={styles.searchRow}>
@@ -556,9 +628,9 @@ export default function HailMap() {
           <HeatmapLayer points={heatPoints} />
         </MapContainer>
 
-        {needsZoomIn && (
+        {!isHighZoom && pool.length > 0 && (
           <div className={styles.zoomPrompt}>
-            Zoom in to load radar hail data
+            Zoom in for radar-quality hail data
           </div>
         )}
 
@@ -572,16 +644,30 @@ export default function HailMap() {
               exit={{    opacity: 0, y: -4,  filter: 'blur(4px)' }}
               transition={{ duration: 0.18, ease: EASE }}
             >
-              <p className={styles.swathDate}>{formatDate(hoveredInfo.record.ZTIME)}</p>
+              <p className={styles.swathDate}>{formatDate(hoveredInfo.entry.time)}</p>
               <div className={styles.swathSizeRow}>
-                <span className={styles.swathSize}>{parseFloat(hoveredInfo.record.MAXSIZE).toFixed(2)}"</span>
-                <span className={styles.swathSizeLabel}>radar hail size</span>
+                <span className={styles.swathSize}>{hoveredInfo.entry.size.toFixed(2)}"</span>
+                <span className={styles.swathSizeLabel}>
+                  {hoveredInfo.entry.source === 'swdi' ? 'radar hail size' : 'reported hail size'}
+                </span>
               </div>
-              <div className={styles.swathSizeRow}>
-                <span className={styles.swathSize}>{hoveredInfo.record.SEVPROB}%</span>
-                <span className={styles.swathSizeLabel}>severe probability</span>
-              </div>
-              <p className={styles.swathLocation}>Radar: {hoveredInfo.record.WSR_ID}</p>
+              {hoveredInfo.entry.source === 'swdi' && hoveredInfo.entry.sevprob !== undefined && (
+                <div className={styles.swathSizeRow}>
+                  <span className={styles.swathSize}>{hoveredInfo.entry.sevprob}%</span>
+                  <span className={styles.swathSizeLabel}>severe probability</span>
+                </div>
+              )}
+              {hoveredInfo.entry.radar && (
+                <p className={styles.swathLocation}>Radar: {hoveredInfo.entry.radar}</p>
+              )}
+              {hoveredInfo.entry.label && (
+                <p className={styles.swathLocation}>{hoveredInfo.entry.label}</p>
+              )}
+              {hoveredInfo.entry.source === 'iem' && (
+                <p className={styles.swathLocation} style={{ opacity: 0.5, fontSize: '0.7rem' }}>
+                  User-reported · zoom in for radar
+                </p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
