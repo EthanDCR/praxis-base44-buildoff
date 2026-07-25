@@ -32,6 +32,29 @@
   flex-shrink: 0;
 }
 
+.strikeCount {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding-left: 4px;
+  border-left: 1px solid var(--surface-border);
+  margin-left: 2px;
+}
+
+.strikeNum {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.strikeSub {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
 .pageTitle {
   font-family: var(--font-display);
   font-size: 0.875rem;
@@ -258,23 +281,85 @@
 }
 
 
-/* Metric */
-.metricBig    { display: flex; align-items: baseline; gap: 7px; }
-.metricNumber {
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 28px rgba(64, 123, 167, 0.45);
-  line-height: 1;
-}
-.metricSub    { font-size: 0.6875rem; color: var(--text-muted); letter-spacing: 0.02em; }
 
 .noSelection {
   font-size: 0.75rem;
   color: var(--text-muted);
   font-style: italic;
+}
+
+/* ── List management ─────────────────────────── */
+.listSelect {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  padding: 7px 10px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.listSelect:focus { border-color: var(--surface-border-strong); }
+.listSelect option { background: var(--surface); }
+
+.newListBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0;
+  text-align: left;
+  letter-spacing: 0.04em;
+  transition: color 0.2s;
+}
+
+.newListBtn:hover { color: var(--text-primary); }
+
+.newListRow {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.newListInput {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.newListInput::placeholder { color: var(--text-muted); }
+.newListInput:focus { border-color: var(--surface-border-strong); }
+
+.newListAction {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 4px 6px;
+  color: var(--text-muted);
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.newListAction:hover { color: var(--text-primary); }
+.newListAction:disabled { opacity: 0.4; cursor: default; }
+
+.addBtnDisabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 /* Selected address */

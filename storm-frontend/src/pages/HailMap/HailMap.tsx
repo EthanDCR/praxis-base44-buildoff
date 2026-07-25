@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { base44 } from '../../lib/base44'
 import { MapContainer, TileLayer, Circle, useMap, useMapEvent } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 import { motion, AnimatePresence } from 'motion/react'
@@ -85,7 +86,8 @@ interface SelectedAddress {
 // IEM sometimes encodes hail size as hundredths of an inch (75 → 0.75")
 // No real hailstone exceeds 10", so anything above that is the encoded form
 function normalizeMagnitude(magnitude: number): number {
-  return magnitude > 10 ? magnitude / 100 : magnitude
+  const n = magnitude > 10 ? magnitude / 100 : magnitude
+  return Math.min(n, 2.5)
 }
 
 function hailIntensity(size: number) {
@@ -95,7 +97,7 @@ function hailIntensity(size: number) {
 function MapController({ center }: { center: [number, number] | null }) {
   const map = useMap()
   useEffect(() => {
-    if (center) map.flyTo(center, 17, { duration: 1.5 })
+    if (center) map.flyTo(center, 18, { duration: 1.5 })
   }, [center, map])
   return null
 }
@@ -142,9 +144,17 @@ export default function HailMap() {
   const [searching, setSearching]       = useState(false)
   const [suggestions, setSuggestions]   = useState<{ place_id: number; display_name: string; lat: string; lon: string }[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const searchWrapperRef = useRef<HTMLDivElement>(null)
   const [tileMode, setTileMode]         = useState<'dark' | 'satellite'>('dark')
   const [minSize, setMinSize]           = useState(1.0)
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
+  const [lists, setLists]                     = useState<{ id: string; name: string }[]>([])
+  const [activeListId, setActiveListId]       = useState<string | null>(null)
+  const [showNewList, setShowNewList]         = useState(false)
+  const [newListName, setNewListName]         = useState('')
+  const [creatingList, setCreatingList]       = useState(false)
+  const [addingTarget, setAddingTarget]       = useState(false)
+  const [addedFeedback, setAddedFeedback]     = useState(false)
   const [hoveredSwath, setHoveredSwath]       = useState<{
     magnitude: number; valid: string; label: string; remark: string
   } | null>(null)
@@ -171,6 +181,60 @@ export default function HailMap() {
     load()
     return () => { cancelled = true }
   }, [rangeDays])
+
+  // Load all call lists on mount
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    base44.entities.CallList.list().then((data: any) => setLists(data)).catch(console.error)
+  }, [])
+
+  const handleCreateList = async () => {
+    if (!newListName.trim() || creatingList) return
+    setCreatingList(true)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const list = await base44.entities.CallList.create({ name: newListName.trim() }) as any
+      setLists(prev => [...prev, list])
+      setActiveListId(list.id)
+      setNewListName('')
+      setShowNewList(false)
+    } catch (e) {
+      console.error('Failed to create list', e)
+    } finally {
+      setCreatingList(false)
+    }
+  }
+
+  const handleAddTarget = async () => {
+    if (!selectedAddress || !activeListId || addingTarget) return
+    setAddingTarget(true)
+    try {
+      await base44.entities.Target.create({
+        list_id: activeListId,
+        line1:   selectedAddress.line1,
+        line2:   selectedAddress.line2,
+        lat:     selectedAddress.lat,
+        lng:     selectedAddress.lng,
+      })
+      setAddedFeedback(true)
+      setTimeout(() => setAddedFeedback(false), 2000)
+    } catch (e) {
+      console.error('Failed to add target', e)
+    } finally {
+      setAddingTarget(false)
+    }
+  }
+
+  // Close suggestions on any click outside the search wrapper
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
 
   // Debounced autocomplete
   useEffect(() => {
@@ -236,9 +300,15 @@ export default function HailMap() {
           {loading            && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
           {!loading && !error && <span className={`${styles.badge} ${styles.badgeLive}`}>● Live</span>}
           {error              && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {error}</span>}
+          {!loading && !error && (
+            <span className={styles.strikeCount}>
+              <span className={styles.strikeNum}>{pool.length}</span>
+              <span className={styles.strikeSub}>strikes · last {rangeDays}d</span>
+            </span>
+          )}
         </div>
         <div className={styles.searchRow}>
-          <div className={styles.searchWrapper}>
+          <div className={styles.searchWrapper} ref={searchWrapperRef}>
             <input
               className={styles.searchInput}
               type="text"
@@ -247,7 +317,6 @@ export default function HailMap() {
               onChange={e => setSearchQuery(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             />
             {showSuggestions && suggestions.length > 0 && (
               <div className={styles.suggestions}>
@@ -315,20 +384,54 @@ export default function HailMap() {
         </SidebarSection>
 
         <SidebarSection delay={0.22}>
-          <h3 className={styles.sectionLabel}>Reports</h3>
-          <div className={styles.metricBig}>
-            <span className={styles.metricNumber}>{loading ? '—' : pool.length}</span>
-            <span className={styles.metricSub}>strikes · last {rangeDays}d</span>
-          </div>
+          <h3 className={styles.sectionLabel}>Active List</h3>
+          {showNewList ? (
+            <div className={styles.newListRow}>
+              <input
+                className={styles.newListInput}
+                placeholder="List name…"
+                value={newListName}
+                onChange={e => setNewListName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreateList()}
+                autoFocus
+              />
+              <button className={styles.newListAction} onClick={handleCreateList} disabled={creatingList}>✓</button>
+              <button className={styles.newListAction} onClick={() => { setShowNewList(false); setNewListName('') }}>✕</button>
+            </div>
+          ) : (
+            <>
+              {lists.length > 0 ? (
+                <select
+                  className={styles.listSelect}
+                  value={activeListId ?? ''}
+                  onChange={e => setActiveListId(e.target.value || null)}
+                >
+                  <option value="">Select a list…</option>
+                  {lists.map(l => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className={styles.noSelection}>No lists yet</p>
+              )}
+              <button className={styles.newListBtn} onClick={() => setShowNewList(true)}>+ New list</button>
+            </>
+          )}
         </SidebarSection>
 
-        <SidebarSection delay={0.36}>
+        <SidebarSection delay={0.29}>
           <h3 className={styles.sectionLabel}>Selected Property</h3>
           {selectedAddress ? (
             <>
               <p className={styles.addrLine1}>{selectedAddress.line1}</p>
               <p className={styles.addrLine2}>{selectedAddress.line2}</p>
-              <button className={styles.addBtn}>+ Add to List</button>
+              <button
+                className={`${styles.addBtn} ${!activeListId ? styles.addBtnDisabled : ''}`}
+                onClick={handleAddTarget}
+                disabled={!activeListId || addingTarget}
+              >
+                {addingTarget ? 'Adding…' : addedFeedback ? '✓ Added' : '+ Add to List'}
+              </button>
             </>
           ) : (
             <p className={styles.noSelection}>Click a location on the map</p>

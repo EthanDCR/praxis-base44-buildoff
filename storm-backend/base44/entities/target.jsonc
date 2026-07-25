@@ -1,0 +1,52 @@
+{
+  "name": "Target",
+  "type": "object",
+  "properties": {
+    "list_id": {
+      "type": "string",
+      "description": "ID of the CallList this target belongs to"
+    },
+    "line1": {
+      "type": "string",
+      "description": "Street address"
+    },
+    "line2": {
+      "type": "string",
+      "description": "City, State"
+    },
+    "lat": {
+      "type": "number",
+      "description": "Latitude"
+    },
+    "lng": {
+      "type": "number",
+      "description": "Longitude"
+    },
+    "hail_size": {
+      "type": "number",
+      "description": "Hail size in inches at this location at time of storm"
+    },
+    "hail_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date of the hail event"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["new", "called", "callback", "not_interested", "sold"],
+      "default": "new",
+      "description": "Current status of this target"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes from the call"
+    }
+  },
+  "required": ["list_id", "line1"],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}
