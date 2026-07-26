@@ -262,22 +262,29 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   background: none;
   border: none;
   border-left: 2px solid transparent;
-  padding: 9px 14px;
+  padding: 9px 12px 9px 10px;
   text-align: left;
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
 }
 
-.queueItem:hover       { background: rgba(255,255,255,0.03); }
-.queueItemActive       { border-left-color: var(--blue-400); background: rgba(64,123,167,0.05); }
-.queueItemDone         { opacity: 0.35; }
+.queueItem:hover            { background: rgba(255,255,255,0.03); }
+.queueItemActive            { background: rgba(64,123,167,0.07); }
+.queueItemDone              { opacity: 0.3; }
+.queueItemStatusNew         { border-left-color: rgba(34, 197, 94, 0.55); }
+.queueItemStatusCallback    { border-left-color: rgba(251, 146, 60, 0.65); }
+.queueItemStatusCalled      { border-left-color: rgba(255,255,255,0.08); }
+.queueItemStatusDone        { border-left-color: transparent; }
+.queueItemActive.queueItemStatusNew      { border-left-color: #22c55e; }
+.queueItemActive.queueItemStatusCallback { border-left-color: #fb923c; }
+.queueItemActive.queueItemStatusCalled   { border-left-color: rgba(255,255,255,0.2); }
 
-.qAddr    { font-size: 0.8125rem; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.qContact { font-size: 0.6875rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qAddr    { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qContact { font-size: 0.6875rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 
 .emptyState {
   height: 100%;
@@ -332,12 +339,20 @@
 }
 
 .statusLabel {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
 }
+
+.statusNew          { color: #22c55e; background: rgba(34,197,94,0.08);  border-color: rgba(34,197,94,0.2); }
+.statusCallback     { color: #fb923c; background: rgba(251,146,60,0.08); border-color: rgba(251,146,60,0.2); }
+.statusCalled       { color: var(--text-muted); background: rgba(255,255,255,0.04); border-color: var(--surface-border); }
+.statusNotInterested{ color: var(--text-muted); background: rgba(255,255,255,0.03); border-color: var(--surface-border); opacity: 0.6; }
+.statusSold         { color: #60a5fa; background: rgba(96,165,250,0.08); border-color: rgba(96,165,250,0.2); }
 
 .navBtns { display: flex; gap: 2px; }
 
@@ -365,8 +380,11 @@
   flex: 1;
   overflow-y: auto;
   scrollbar-width: none;
-  padding: 0 28px;
+  padding: 16px 20px;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .contacts::-webkit-scrollbar { display: none; }
@@ -374,26 +392,47 @@
 .noContacts { font-size: 0.875rem; color: var(--text-muted); font-style: italic; padding: 20px 0; }
 
 .contact {
-  padding: 20px 0;
-  border-bottom: 1px solid var(--surface-border);
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.contact:last-child { border-bottom: none; }
+.contactHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
 .contactName {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.3;
 }
 
 .contactRole {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
-  margin-bottom: 4px;
+}
+
+.contactSection {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.contactSectionLabel {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin-bottom: 2px;
 }
 
 .phoneRow {
@@ -401,42 +440,56 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 4px 0;
 }
 
 .phone {
-  font-size: 1rem;
-  font-weight: 400;
+  font-size: 0.9375rem;
+  font-weight: 500;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.015em;
+  letter-spacing: 0.02em;
 }
 
-/* Active phone row — glow on the number */
-.phoneRowActive {
-  position: relative;
-}
+.phoneRowActive { background: transparent; }
 
 .phoneActive {
   color: var(--text-primary);
   font-weight: 600;
-  text-shadow: 0 0 18px rgba(255, 255, 255, 0.25);
 }
 
 .dialLoadBtn {
-  background: none; border: none;
-  color: var(--text-muted); font-family: inherit;
-  font-size: 0.6875rem; font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  padding: 3px 0; flex-shrink: 0;
-  transition: color 0.12s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 4px;
+  color: #22c55e;
+  padding: 5px 7px;
+  transition: background 0.12s, border-color 0.12s;
 }
-.dialLoadBtn:hover       { color: var(--text-primary); }
-.dialLoadBtnActive       { color: var(--text-secondary); }
+.dialLoadBtn:hover {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+.dialLoadBtnActive {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+
+.emailList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
 
 .emailRow {
   font-size: 0.75rem;
   color: var(--text-muted);
-  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Outcome modal ───────────────────────────────────────────────────────── */

@@ -1,41 +1,32 @@
-import { NavLink } from 'react-router-dom'
-import { motion } from 'motion/react'
-import Logo from '../Logo/Logo'
+import { NavLink, useLocation } from 'react-router-dom'
+import { useLottie } from 'lottie-react'
+import animationData from '../../assets/praxis-animation-lottie.json'
 import styles from './Navbar.module.css'
 
-const EASE = [0.22, 1, 0.36, 1] as const
+function LogoAnimation() {
+  const { View } = useLottie({ animationData, loop: false, autoplay: true, className: styles.logoLottie })
+  return <>{View}</>
+}
 
 export default function Navbar() {
+  const location = useLocation()
   return (
-    <motion.nav
-      className={styles.nav}
-      initial={{ y: -64, opacity: 0, filter: 'blur(10px)' }}
-      animate={{ y: 0,   opacity: 1, filter: 'blur(0px)'  }}
-      transition={{ duration: 1.1, ease: EASE }}
-    >
-      <motion.div
-        className={styles.brand}
-        initial={{ opacity: 0, x: -16, filter: 'blur(6px)' }}
-        animate={{ opacity: 1, x: 0,   filter: 'blur(0px)' }}
-        transition={{ delay: 0.35, duration: 0.9, ease: EASE }}
-      >
-        <Logo size={22} className={styles.logoMark} />
-        <span className={styles.brandName}>Praxis</span>
-        <span className={styles.brandTagline}>from vision to reality</span>
-      </motion.div>
+    <nav className={styles.nav}>
+      <div className={styles.brand}>
+        <LogoAnimation key={location.pathname} />
+        <div className={styles.brandText}>
+          <span className={styles.brandName}>Praxis</span>
+          <span className={styles.brandTagline}>from vision to reality</span>
+        </div>
+      </div>
 
       <ul className={styles.links}>
         {[
           { to: '/',           label: 'Storm Map' },
           { to: '/speed-dial', label: 'Targets'   },
           { to: '/leads',      label: 'Leads'     },
-        ].map(({ to, label }, i) => (
-          <motion.li
-            key={to}
-            initial={{ opacity: 0, y: -14, filter: 'blur(4px)' }}
-            animate={{ opacity: 1, y: 0,   filter: 'blur(0px)' }}
-            transition={{ delay: 0.5 + i * 0.11, duration: 0.7, ease: EASE }}
-          >
+        ].map(({ to, label }) => (
+          <li key={to}>
             <NavLink
               to={to}
               end={to === '/'}
@@ -45,9 +36,9 @@ export default function Navbar() {
             >
               {label}
             </NavLink>
-          </motion.li>
+          </li>
         ))}
       </ul>
-    </motion.nav>
+    </nav>
   )
 }

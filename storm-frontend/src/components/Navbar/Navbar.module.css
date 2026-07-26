@@ -20,7 +20,7 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 0;
   user-select: none;
 }
 
@@ -28,6 +28,20 @@
   color: var(--text-primary);
   flex-shrink: 0;
   opacity: 0.95;
+}
+
+.logoLottie {
+  height: 70px;
+  width: 120px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-left: -30px;
 }
 
 .brandName {
@@ -47,8 +61,6 @@
   text-transform: uppercase;
   color: var(--text-muted);
   padding-left: 1px;
-  align-self: flex-end;
-  padding-bottom: 2px;
 }
 
 /* ── Nav links — plain text, no button chrome ── */
