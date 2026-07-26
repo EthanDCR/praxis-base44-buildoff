@@ -1,0 +1,8 @@
+xarray
+cfgrib
+rasterio
+shapely
+boto3
+requests
+python-dotenv
+numpy

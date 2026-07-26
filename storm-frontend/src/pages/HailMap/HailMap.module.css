@@ -702,3 +702,33 @@
 
 .mapWrapper :global(.leaflet-popup-tip)          { background: #0d1830; }
 .mapWrapper :global(.leaflet-popup-close-button) { color: var(--text-muted); }
+
+/* Hail swath hover tooltip */
+.mapWrapper :global(.swathTooltip.leaflet-tooltip) {
+  background: rgba(10, 18, 40, 0.92);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.55);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.mapWrapper :global(.swathTooltip.leaflet-tooltip::before) {
+  display: none;
+}
+
+.swathTipDate {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  margin-bottom: 2px;
+}
+
+.swathTipSize {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}

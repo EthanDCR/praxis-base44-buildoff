@@ -1,0 +1,29 @@
+{
+  "name": "HailSwath",
+  "type": "object",
+  "properties": {
+    "event_date": {
+      "type": "string",
+      "description": "Date of the hail event (YYYY-MM-DD)"
+    },
+    "min_size_inches": {
+      "type": "number",
+      "description": "Minimum hail size for this polygon in inches (e.g. 0.5, 1.0, 1.5, 2.0)"
+    },
+    "hail_size_bin": {
+      "type": "string",
+      "description": "Human-readable size label (e.g. '1.0\"')"
+    },
+    "geometry": {
+      "type": "string",
+      "description": "GeoJSON geometry object serialized as a JSON string"
+    }
+  },
+  "required": ["event_date", "min_size_inches", "geometry"],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}

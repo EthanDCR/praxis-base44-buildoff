@@ -30,6 +30,56 @@
   min-width: 0;
 }
 
+/* Hail line — under address on target card */
+.hailLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  min-height: 16px;
+}
+
+.hailLineLabel {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.hailLineText {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.hailLineDate {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.hailLineDot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.hailLineSize {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #60a5fa;
+  font-variant-numeric: tabular-nums;
+}
+
+.hailLineMore {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
 /* Daily tracker */
 .dailyTracker {
   display: flex;
@@ -396,7 +446,7 @@
 }
 
 .propMapWrap {
-  height: 200px;
+  height: 260px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--surface-border);
   overflow: hidden;
@@ -466,6 +516,34 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Hail history */
+.hailSection {
+  border-top: 1px solid var(--surface-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.hailSectionLabel {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 16px 8px;
+}
+
+.hailMsg {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 4px 16px 12px;
+}
+
+.hailSizeVal {
+  color: #60a5fa;
+  font-weight: 600;
 }
 
 /* Contacts */

@@ -19,12 +19,6 @@
 
 - TARGETS PAGE 
 
-- fix the dialer not loading and calling next nuber automatically
-
-- map view on targets page so showing an image of the property satalite image of property thats being called
-
-- notes section on targets page to just add notes about the property, and then remove the notes from the logging pop out
-
 - move the total counter to a daily counter and move it over to the right by "start dialing button"
 (if inspection set, told no, scheduled call back, log this as decision maker)
 

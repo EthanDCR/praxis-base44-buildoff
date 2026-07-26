@@ -71,6 +71,12 @@ const OUTCOME_TO_STATUS: Record<OutcomeOption, Target['status']> = {
   dead_number:            'called',
 }
 
+interface HailEvent {
+  ImpactDate?: string; impact_date?: string; date?: string
+  MaxSize?: number; max_size?: number; HailSize?: number; size?: number
+  [key: string]: any
+}
+
 interface DailyStats { date: string; calls: number; dms: number; leads: number }
 
 function todayStr() { return new Date().toISOString().slice(0, 10) }
@@ -129,6 +135,10 @@ export default function SpeedDial() {
 
   // Daily call tracker (persisted in localStorage, resets at midnight)
   const [dailyStats, setDailyStats] = useState<DailyStats>(loadDailyStats)
+
+  // Hail data for active property
+  const [hailData, setHailData]       = useState<HailEvent[] | null>(null)
+  const [hailLoading, setHailLoading] = useState(false)
 
   // Dialer
   const [twilioReady, setTwilioReady]     = useState(false)
@@ -243,6 +253,34 @@ export default function SpeedDial() {
 
   const activeTarget = targets.find(t => t.id === activeId) ?? null
   const activeList   = lists.find(l => l.id === activeListId)
+
+  // Fetch hail history when active target changes — depends on the resolved lat/lng
+  useEffect(() => {
+    if (!activeTarget?.lat || !activeTarget?.lng) { setHailData(null); return }
+    setHailLoading(true)
+    setHailData(null)
+    fetch(`/ihm-api/ImpactDatesForLatLong?Lat=${activeTarget.lat}&Long=${activeTarget.lng}&Months=36`)
+      .then(r => { if (!r.ok) throw new Error(`IHM ${r.status}`); return r.json() })
+      .then((data: any) => {
+        console.log('IHM raw response:', data)
+        const events: HailEvent[] = Array.isArray(data) ? data : (data.ImpactDates ?? data.impactDates ?? data.results ?? [])
+        setHailData(events)
+      })
+      .catch(err => { console.error('IHM error:', err); setHailData([]) })
+      .finally(() => setHailLoading(false))
+  }, [activeTarget?.lat, activeTarget?.lng, activeTarget?.id])
+
+  function hailEventDate(e: HailEvent): string {
+    const raw = e.ImpactDate ?? e.impact_date ?? e.date ?? ''
+    if (!raw) return '—'
+    try { return new Date(raw).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
+    catch { return raw }
+  }
+
+  function hailEventSize(e: HailEvent): string {
+    const s = e.MaxSize ?? e.max_size ?? e.HailSize ?? e.hail_size ?? e.size ?? null
+    return s != null ? `${s}"` : '—'
+  }
 
   // Sync notes draft whenever we switch to a different target
   useEffect(() => {
@@ -620,6 +658,23 @@ export default function SpeedDial() {
                     <div>
                       <div className={styles.address}>{activeTarget.line1}</div>
                       {activeTarget.line2 && <div className={styles.addressSub}>{activeTarget.line2}</div>}
+                      <div className={styles.hailLine}>
+                        {hailLoading && <span className={styles.hailLineText}>Loading hail data…</span>}
+                        {!hailLoading && hailData && hailData.length === 0 && (
+                          <span className={styles.hailLineText}>No hail events on record</span>
+                        )}
+                        {!hailLoading && hailData && hailData.length > 0 && (
+                          <>
+                            <span className={styles.hailLineLabel}>Last hit</span>
+                            <span className={styles.hailLineDate}>{hailEventDate(hailData[0])}</span>
+                            <span className={styles.hailLineDot} />
+                            <span className={styles.hailLineSize}>{hailEventSize(hailData[0])}</span>
+                            {hailData.length > 1 && (
+                              <span className={styles.hailLineMore}>{hailData.length} events</span>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className={styles.headRight}>
                       <span className={[
@@ -773,23 +828,8 @@ export default function SpeedDial() {
                   <span className={styles.propDataKey}>Roof Material</span>
                   <span className={styles.propDataVal}>—</span>
                 </div>
-                <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Est. Value</span>
-                  <span className={styles.propDataVal}>—</span>
-                </div>
-                <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Owner Type</span>
-                  <span className={styles.propDataVal}>—</span>
-                </div>
-                <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Lot Size</span>
-                  <span className={styles.propDataVal}>—</span>
-                </div>
-                <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Stories</span>
-                  <span className={styles.propDataVal}>—</span>
-                </div>
               </div>
+
             </div>
           </div>
 

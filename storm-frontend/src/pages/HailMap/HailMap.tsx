@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { base44 } from '../../lib/base44'
-import { MapContainer, TileLayer, useMap, useMapEvent, Rectangle, GeoJSON as GeoJSONLayer } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap, useMapEvent, GeoJSON as GeoJSONLayer, Tooltip } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
+import type * as GeoJSON from 'geojson'
 import { motion, AnimatePresence } from 'motion/react'
-import { fetchStorms, fetchSwathGeometry } from '../../lib/swath'
-import type { SwathStorm, SwathGeometry } from '../../lib/swath'
 import 'leaflet/dist/leaflet.css'
 import styles from './HailMap.module.css'
 
@@ -122,14 +121,14 @@ export default function HailMap() {
   const [rangeDays, setRangeDays] = useState(7)
   const [minSize, setMinSize]     = useState(1.0)
 
-  // ── Swath data ────────────────────────────────────────────────────
-  const [swathStorms, setSwathStorms]     = useState<SwathStorm[]>([])
-  const [swathGeoms, setSwathGeoms]       = useState<Record<string, SwathGeometry>>({})
-  const swathGeomsRef                     = useRef<Record<string, SwathGeometry>>({})
-  const [activeSwathId, setActiveSwathId] = useState<string | null>(null)
-  const [swathLoading, setSwathLoading]   = useState(false)
-  const [swathError, setSwathError]       = useState<string | null>(null)
-  const [swathCredits, setSwathCredits]   = useState(0)
+  // ── MRMS swath data (from hail pipeline → Base44) ─────────────────
+  const [mrmsFeatures, setMrmsFeatures] = useState<any[]>([])
+
+  useEffect(() => {
+    base44.entities.HailSwath.list()
+      .then((data: any) => setMrmsFeatures(Array.isArray(data) ? data : (data?.data ?? [])))
+      .catch(console.error)
+  }, [])
 
   // ── Property / list state ─────────────────────────────────────────
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
@@ -142,49 +141,10 @@ export default function HailMap() {
   const [addingTarget, setAddingTarget] = useState(false)
   const [addedFeedback, setAddedFeedback] = useState(false)
 
-  // Keep geom ref in sync with state so geometry handler can check cache without being in deps
-  useEffect(() => { swathGeomsRef.current = swathGeoms }, [swathGeoms])
-
   // ── Load lists ────────────────────────────────────────────────────
   useEffect(() => {
     base44.entities.CallList.list().then((data: any) => setLists(data)).catch(console.error)
   }, [])
-
-  // ── Fetch storms + all geometries once per date-range change ─────────
-  useEffect(() => {
-    let cancelled = false
-    setSwathLoading(true)
-    setSwathError(null)
-    setSwathStorms([])
-    setSwathGeoms({})
-    swathGeomsRef.current = {}
-    setActiveSwathId(null)
-    setSwathCredits(0)
-
-    const since = new Date(Date.now() - rangeDays * 86400000).toISOString()
-
-    fetchStorms(since).then(storms => {
-      if (cancelled) return
-      setSwathStorms(storms)
-      setSwathCredits(1)
-
-      // Fire all geometry requests in parallel — draw polygons as each arrives
-      storms.forEach(s => {
-        if (!s.swath_id) return
-        fetchSwathGeometry(s.swath_id)
-          .then(geom => {
-            if (cancelled) return
-            setSwathGeoms(prev => ({ ...prev, [s.storm_id]: geom }))
-            setSwathCredits(c => c + 1)
-          })
-          .catch(() => {}) // silently skip if one fails (e.g. rate limit)
-      })
-    })
-    .catch(e => { if (!cancelled) setSwathError(e instanceof Error ? e.message : 'Failed') })
-    .finally(() => { if (!cancelled) setSwathLoading(false) })
-
-    return () => { cancelled = true }
-  }, [rangeDays])
 
   // ── Search ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -274,33 +234,7 @@ export default function HailMap() {
     }
   }
 
-  async function handleSelectStorm(stormId: string, swathId: string) {
-    setActiveSwathId(prev => prev === stormId ? null : stormId)
-    if (swathGeomsRef.current[stormId]) return
-    try {
-      const geom = await fetchSwathGeometry(swathId)
-      setSwathGeoms(prev => ({ ...prev, [stormId]: geom }))
-      setSwathCredits(c => c + 1)
-    } catch (e) {
-      console.error('Geometry load failed', e)
-    }
-  }
-
   const handleView = useCallback((v: ViewState) => setViewState(v), [])
-
-  // Filter by min size + current viewport (so the sidebar only shows nearby storms)
-  const filteredStorms = swathStorms.filter(s => {
-    if ((s.mesh_max_in ?? 0) < minSize) return false
-    if (!viewState || !s.centroid_lon || !s.centroid_lat) return true
-    return (
-      s.centroid_lon >= viewState.west  && s.centroid_lon <= viewState.east &&
-      s.centroid_lat >= viewState.south && s.centroid_lat <= viewState.north
-    )
-  })
-  const allFiltered  = swathStorms.filter(s => (s.mesh_max_in ?? 0) >= minSize)
-  const activeStorm  = activeSwathId ? allFiltered.find(s => s.storm_id === activeSwathId) : null
-  const maxHail      = allFiltered.length > 0 ? Math.max(...allFiltered.map(s => s.mesh_max_in ?? 0)) : 0
-  const tooZoomedOut = false
 
   return (
     <div className={styles.page}>
@@ -314,19 +248,6 @@ export default function HailMap() {
       >
         <div className={styles.topBarLeft}>
           <span className={styles.pageTitle}>Storm Map</span>
-          {swathLoading && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
-          {!swathLoading && !swathError && filteredStorms.length > 0 && (
-            <span className={`${styles.badge} ${styles.badgeLive}`}>● Live</span>
-          )}
-          {swathError && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {swathError}</span>}
-          {!swathLoading && filteredStorms.length > 0 && (
-            <span className={styles.strikeCount}>
-              <span className={styles.strikeNum}>{filteredStorms.length}</span>
-              <span className={styles.strikeSub}>
-                storms · last {rangeDays}d · max {maxHail.toFixed(2)}"
-              </span>
-            </span>
-          )}
         </div>
 
         <div className={styles.searchRow}>
@@ -406,34 +327,6 @@ export default function HailMap() {
         </SidebarSection>
 
         <SidebarSection delay={0.22}>
-          <h3 className={styles.sectionLabel}>Swaths</h3>
-          {swathLoading && <p className={styles.swathHint}>Loading storms…</p>}
-          {!swathLoading && swathStorms.length === 0 && (
-            <p className={styles.swathHint}>No storms in this date range</p>
-          )}
-          {swathStorms.length > 0 && (
-            <>
-              <div className={styles.swathSummaryRow}>
-                <span className={styles.swathSummaryNum}>{allFiltered.length}</span>
-                <span className={styles.swathSummaryLabel}>storms loaded</span>
-              </div>
-              <div className={styles.swathSummaryRow}>
-                <span className={styles.swathSummaryNum} style={{ color: hailColor(maxHail) }}>{maxHail.toFixed(2)}"</span>
-                <span className={styles.swathSummaryLabel}>largest hail</span>
-              </div>
-              <div className={styles.swathSummaryRow}>
-                <span className={styles.swathSummaryNum}>{Object.keys(swathGeoms).length}</span>
-                <span className={styles.swathSummaryLabel}>polygons drawn</span>
-              </div>
-              <p className={styles.swathHint} style={{ marginTop: 4 }}>Click any swath on the map for details</p>
-            </>
-          )}
-          {swathCredits > 0 && (
-            <p className={styles.swathCreditNote}>{swathCredits} credit{swathCredits !== 1 ? 's' : ''} used</p>
-          )}
-        </SidebarSection>
-
-        <SidebarSection delay={0.29}>
           <h3 className={styles.sectionLabel}>Active List</h3>
           {showNewList ? (
             <div className={styles.newListRow}>
@@ -553,65 +446,49 @@ export default function HailMap() {
           <MapClickHandler onAddress={setSelectedAddress} />
           <BoundsTracker onView={handleView} />
 
-          {filteredStorms.map(s => {
-            const color   = hailColor(s.mesh_max_in ?? 0)
-            const active  = s.storm_id === activeSwathId
-            const geom    = swathGeoms[s.storm_id]
-            const onClick = () => handleSelectStorm(s.storm_id, s.swath_id)
-
-            if (geom) {
-              return (
-                <GeoJSONLayer
-                  key={s.storm_id}
-                  data={geom as GeoJSON.GeoJsonObject}
-                  style={{
-                    color,
-                    fillColor:   color,
-                    fillOpacity: active ? 0.38 : 0.2,
-                    weight:      active ? 2.5 : 1.5,
-                    opacity:     active ? 1.0 : 0.75,
-                  }}
-                  eventHandlers={{ click: onClick }}
-                />
-              )
-            }
-
-            return null
-          })}
+          {/* MRMS hail swath polygons from the hail pipeline */}
+          {mrmsFeatures
+            .filter(f => {
+              if ((f.min_size_inches ?? 0) < minSize) return false
+              if (f.event_date) {
+                const cutoff = new Date(Date.now() - rangeDays * 86400000)
+                const evDate = new Date(f.event_date)
+                if (evDate < cutoff) return false
+              }
+              return true
+            })
+            .map((f, i) => {
+              try {
+                const geometry = JSON.parse(f.geometry)
+                const color    = hailColor(f.min_size_inches)
+                const dateLabel = f.event_date
+                  ? new Date(f.event_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : 'Unknown date'
+                return (
+                  <GeoJSONLayer
+                    key={`mrms-${f.id ?? i}`}
+                    data={{ type: 'Feature', geometry, properties: {} } as GeoJSON.GeoJsonObject}
+                    style={{
+                      color,
+                      fillColor:   color,
+                      fillOpacity: 0.28,
+                      weight:      1.5,
+                      opacity:     0.85,
+                    }}
+                  >
+                    <Tooltip sticky className={styles.swathTooltip}>
+                      <span className={styles.swathTipDate}>{dateLabel}</span>
+                      <span className={styles.swathTipSize} style={{ color }}>
+                        {f.hail_size_bin ?? `${f.min_size_inches}"`} · {hailLabel(f.min_size_inches)}
+                      </span>
+                    </Tooltip>
+                  </GeoJSONLayer>
+                )
+              } catch { return null }
+            })
+          }
         </MapContainer>
 
-        {/* Active storm detail panel */}
-        <AnimatePresence>
-          {activeStorm && (
-            <motion.div
-              key="swath-panel"
-              className={styles.swathInfo}
-              initial={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
-              exit={{    opacity: 0, y: -4,  filter: 'blur(4px)' }}
-              transition={{ duration: 0.18, ease: EASE }}
-            >
-              <p className={styles.swathDate}>
-                {new Date(activeStorm.started_at).toLocaleString('en-US', {
-                  month: 'short', day: 'numeric', year: 'numeric',
-                  hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
-                })}
-              </p>
-              <div className={styles.swathSizeRow}>
-                <span className={styles.swathSize} style={{ color: hailColor(activeStorm.mesh_max_in ?? 0) }}>
-                  {(activeStorm.mesh_max_in ?? 0).toFixed(2)}"
-                </span>
-                <span className={styles.swathSizeLabel}>{hailLabel(activeStorm.mesh_max_in ?? 0)}</span>
-              </div>
-              {activeStorm.area_km2 != null && (
-                <div className={styles.swathSizeRow}>
-                  <span className={styles.swathSize}>{Math.round(activeStorm.area_km2)}</span>
-                  <span className={styles.swathSizeLabel}>km² affected</span>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.div>
 
     </div>
