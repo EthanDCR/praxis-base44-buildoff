@@ -35,6 +35,32 @@
   position: relative;
 }
 
+@keyframes drawBorder {
+  0%   { stroke-dashoffset: 400; opacity: 1; }
+  65%  { stroke-dashoffset: 0;   opacity: 1; }
+  100% { stroke-dashoffset: 0;   opacity: 0; }
+}
+
+.listGlowSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 10;
+}
+
+.listGlowRect {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.65);
+  stroke-width: 1.5;
+  stroke-dasharray: 400;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.4));
+  animation: drawBorder 1.1s ease-out forwards;
+  animation-delay: 0.15s;
+}
+
 .sidebarEmpty {
   padding: 16px;
   font-size: 0.8125rem;
@@ -53,8 +79,7 @@
 .listCard:hover { border-color: var(--surface-border-strong); }
 
 .listCardActive {
-  border-color: rgba(64,123,167,0.5);
-  background: rgba(64,123,167,0.08);
+  border-color: rgba(255,255,255,0.2);
 }
 
 .listCardMain {

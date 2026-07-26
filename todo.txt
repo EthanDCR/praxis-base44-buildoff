@@ -1,0 +1,2 @@
+Target page should just show all the targets with the option to select a list, not the other way around.
+

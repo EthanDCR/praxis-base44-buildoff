@@ -11,18 +11,18 @@
   --blue-950: #00043a;
 
   /* Semantic */
-  --bg:              #00020f;
-  --surface:         #080f24;
-  --surface-raised:  #0d1830;
-  --surface-border:  rgba(64, 123, 167, 0.18);
-  --surface-border-strong: rgba(64, 123, 167, 0.4);
+  --bg:              #020514;
+  --surface:         #0a1528;
+  --surface-raised:  #111e38;
+  --surface-border:  rgba(64, 123, 167, 0.28);
+  --surface-border-strong: rgba(64, 123, 167, 0.55);
   --accent:          var(--red-600);
   --accent-hover:    var(--red-400);
   --accent-glow:     rgba(192, 0, 33, 0.35);
   --blue-glow:       rgba(64, 123, 167, 0.2);
-  --text-primary:    #eef2ff;
-  --text-secondary:  #7b9ec4;
-  --text-muted:      #3d5a7a;
+  --text-primary:    #f0f4ff;
+  --text-secondary:  #a8c4de;
+  --text-muted:      #6b90af;
 
   --nav-height: 64px;
   --radius-sm: 6px;
@@ -50,7 +50,7 @@ body {
   min-height: 100vh;
   background-color: var(--bg);
   /* Dot grid texture */
-  background-image: radial-gradient(circle, rgba(64, 123, 167, 0.12) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(64, 123, 167, 0.18) 1px, transparent 1px);
   background-size: 28px 28px;
   /* Atmospheric blue glow at top */
   background-attachment: fixed;

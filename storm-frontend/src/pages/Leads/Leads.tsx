@@ -155,6 +155,11 @@ export default function Leads() {
       <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}>Lists</div>
         <div className={styles.listItems} ref={dropdownRef}>
+          {lists.length > 0 && (
+            <svg aria-hidden className={styles.listGlowSvg} viewBox="0 0 100 100" preserveAspectRatio="none">
+              <rect className={styles.listGlowRect} x="0.5" y="0.5" width="99" height="99" rx="3" vectorEffect="non-scaling-stroke" />
+            </svg>
+          )}
           {lists.length === 0 && (
             <div className={styles.sidebarEmpty}>No lists found</div>
           )}
