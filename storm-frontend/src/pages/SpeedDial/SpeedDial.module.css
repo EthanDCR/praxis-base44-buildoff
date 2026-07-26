@@ -384,6 +384,90 @@
   letter-spacing: 0.01em;
 }
 
+/* ── Property panel (satellite + data) ──────────────────────────────────── */
+.propPanel {
+  width: 252px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--surface-border);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.propMapWrap {
+  height: 200px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--surface-border);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Oversize the iframe and offset it upward so the Maps/Google/Terms chrome
+   gets clipped by the container's overflow:hidden */
+.propMap {
+  position: absolute;
+  top: -52px;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 104px);
+  border: none;
+}
+
+.propMapPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.propDataSection {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.propDataSection::-webkit-scrollbar { display: none; }
+
+.propDataGrid {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0 12px;
+}
+
+.propDataRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.propDataRow:last-child { border-bottom: none; }
+
+.propDataKey {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.propDataVal {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Contacts */
 .contacts {
   flex: 1;

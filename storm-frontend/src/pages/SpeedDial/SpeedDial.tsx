@@ -19,6 +19,10 @@ interface Target {
   list_id: string
   line1: string
   line2?: string
+  lat?: number
+  lng?: number
+  hail_size?: number
+  hail_date?: string
   property_type?: string
   property_subtype?: string
   year_built?: string
@@ -91,6 +95,15 @@ const STATUS_LABEL: Record<string, string> = {
 
 function formatDuration(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+function googleMapsEmbedUrl(target: Target): string {
+  if (target.lat && target.lng) {
+    const loc = `${target.lat},${target.lng}`
+    return `https://www.google.com/maps?q=${loc}&ll=${loc}&t=k&z=18&output=embed`
+  }
+  const addr = encodeURIComponent([target.line1, target.line2].filter(Boolean).join(', '))
+  return `https://www.google.com/maps?q=${addr}&t=k&z=18&output=embed`
 }
 
 export default function SpeedDial() {
@@ -709,6 +722,72 @@ export default function SpeedDial() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          {/* ── Property panel: satellite + data ─────────────────── */}
+          <div className={styles.propPanel}>
+            {/* Satellite map — Google Maps iframe, no API key needed */}
+            <div className={styles.propMapWrap}>
+              {activeTarget ? (
+                <iframe
+                  key={activeId}
+                  src={googleMapsEmbedUrl(activeTarget)}
+                  className={styles.propMap}
+                  loading="lazy"
+                  title="Property satellite view"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className={styles.propMapPlaceholder} />
+              )}
+            </div>
+
+            {/* Property data */}
+            <div className={styles.propDataSection}>
+              <div className={styles.panelLabel}>Property Data</div>
+              <div className={styles.propDataGrid}>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Type</span>
+                  <span className={styles.propDataVal}>{activeTarget?.property_type ?? '—'}</span>
+                </div>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Subtype</span>
+                  <span className={styles.propDataVal}>{activeTarget?.property_subtype ?? '—'}</span>
+                </div>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Year Built</span>
+                  <span className={styles.propDataVal}>{activeTarget?.year_built ?? '—'}</span>
+                </div>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Sq Footage</span>
+                  <span className={styles.propDataVal}>—</span>
+                </div>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Roof Age</span>
+                  <span className={styles.propDataVal}>—</span>
+                </div>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Roof Material</span>
+                  <span className={styles.propDataVal}>—</span>
+                </div>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Est. Value</span>
+                  <span className={styles.propDataVal}>—</span>
+                </div>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Owner Type</span>
+                  <span className={styles.propDataVal}>—</span>
+                </div>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Lot Size</span>
+                  <span className={styles.propDataVal}>—</span>
+                </div>
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Stories</span>
+                  <span className={styles.propDataVal}>—</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* ── Right panel: dialer + transcript ──────────────────── */}
