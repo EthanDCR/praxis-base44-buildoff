@@ -1,2 +1,11 @@
-Target page should just show all the targets with the option to select a list, not the other way around.
+- Target page should just show all the targets with the option to select a list, not the other way around.
 
+- Leads page should also be like that where its just showing all of the leads that can be filtered and it will show like most recent, but then also give the option to select a specific list
+
+- dialer doesnt auto load and call next number
+
+- search function on targets page
+
+- on targets page have a daily running tracker for call results
+
+- use noaa just for reported hits and show them 
