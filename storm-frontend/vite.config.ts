@@ -6,5 +6,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     allowedHosts: true,
+    proxy: {
+      '/swath-api': {
+        target: 'https://swathapi.com',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/swath-api/, ''),
+      },
+    },
   },
 })

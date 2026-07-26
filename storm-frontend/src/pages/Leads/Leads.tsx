@@ -21,6 +21,7 @@ interface Target {
   contacts?: Contact[]
   status: 'new' | 'called' | 'callback' | 'not_interested' | 'sold'
   notes?: string
+  created_at?: string
 }
 
 interface CallList {
@@ -87,27 +88,35 @@ function applyFilter(targets: Target[], filter: StatusFilter): Target[] {
 }
 
 export default function Leads() {
-  const [lists, setLists]                   = useState<CallList[]>([])
+  const [lists, setLists]               = useState<CallList[]>([])
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
-  const [targets, setTargets]               = useState<Target[]>([])
-  const [loading, setLoading]               = useState(false)
-  const [statusFilter, setStatusFilter]     = useState<StatusFilter>('all')
-  const [openDropdown, setOpenDropdown]     = useState<string | null>(null)
-  const dropdownRef                         = useRef<HTMLDivElement>(null)
+  const [allTargets, setAllTargets]     = useState<Target[]>([])
+  const [loading, setLoading]           = useState(false)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const dropdownRef                     = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     base44.entities.CallList.list().then((d: any) => setLists(d)).catch(console.error)
   }, [])
 
   useEffect(() => {
-    if (!selectedListId) return
     setLoading(true)
-    setTargets([])
-    base44.entities.Target.filter({ list_id: selectedListId })
-      .then((d: any) => setTargets(d))
+    base44.entities.Target.list()
+      .then((d: any) => {
+        const sorted = [...d].sort((a: Target, b: Target) =>
+          (b.created_at ?? '').localeCompare(a.created_at ?? '')
+        )
+        setAllTargets(sorted)
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [selectedListId])
+  }, [])
+
+  // Client-side list filter
+  const targets = selectedListId
+    ? allTargets.filter(t => t.list_id === selectedListId)
+    : allTargets
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -129,6 +138,7 @@ export default function Leads() {
   }
 
   const selectedList = lists.find(l => l.id === selectedListId)
+  const listName     = selectedList?.name ?? 'All Leads'
 
   const stats = {
     total:          targets.length,
@@ -153,27 +163,31 @@ export default function Leads() {
 
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside className={styles.sidebar}>
-        <div className={styles.sidebarHeader}>Lists</div>
+        <div className={styles.sidebarHeader}>Filter by List</div>
         <div className={styles.listItems} ref={dropdownRef}>
-          {lists.length > 0 && (
-            <svg aria-hidden className={styles.listGlowSvg} viewBox="0 0 100 100" preserveAspectRatio="none">
-              <rect className={styles.listGlowRect} x="0.5" y="0.5" width="99" height="99" rx="3" vectorEffect="non-scaling-stroke" />
-            </svg>
-          )}
-          {lists.length === 0 && (
-            <div className={styles.sidebarEmpty}>No lists found</div>
-          )}
+          <motion.button
+            className={`${styles.listCard} ${styles.listCardMain} ${!selectedListId ? styles.listCardActive : ''}`}
+            onClick={() => { setSelectedListId(null); setStatusFilter('all') }}
+            initial={{ opacity: 0, x: -14, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, x: 0,   filter: 'blur(0px)' }}
+            transition={{ duration: 0.4, ease: EASE }}
+          >
+            <span className={styles.listCardName}>All Lists</span>
+            <span className={styles.listCardMeta}>{allTargets.length} leads</span>
+          </motion.button>
+
           {lists.map((l, i) => {
-            const ls      = l.list_status ?? 'not_started'
-            const lsDef   = LIST_STATUSES.find(s => s.value === ls)!
-            const isOpen  = openDropdown === l.id
+            const ls         = l.list_status ?? 'not_started'
+            const lsDef      = LIST_STATUSES.find(s => s.value === ls)!
+            const isOpen     = openDropdown === l.id
             const isSelected = l.id === selectedListId
+            const count      = allTargets.filter(t => t.list_id === l.id).length
             return (
               <motion.div
                 key={l.id}
                 initial={{ opacity: 0, x: -14, filter: 'blur(4px)' }}
                 animate={{ opacity: 1, x: 0,   filter: 'blur(0px)' }}
-                transition={{ delay: i * 0.055, duration: 0.5, ease: EASE }}
+                transition={{ delay: (i + 1) * 0.05, duration: 0.4, ease: EASE }}
                 className={`${styles.listCard} ${isSelected ? styles.listCardActive : ''}`}
               >
                 <button
@@ -181,12 +195,10 @@ export default function Leads() {
                   onClick={() => { setSelectedListId(l.id); setStatusFilter('all') }}
                 >
                   <span className={styles.listCardName}>{l.name}</span>
-                  {isSelected && !loading && (
-                    <span className={styles.listCardMeta}>{stats.callback} callbacks · {stats.sold} set</span>
-                  )}
+                  <span className={styles.listCardMeta}>{count} leads</span>
                 </button>
 
-                <div className={styles.listCardFooter}>
+                <div className={styles.listCardFooter} ref={isOpen ? dropdownRef : null}>
                   <button
                     className={`${styles.listStatusBtn} ${styles[`listStatus_${ls}`]}`}
                     onClick={e => { e.stopPropagation(); setOpenDropdown(isOpen ? null : l.id) }}
@@ -219,16 +231,10 @@ export default function Leads() {
 
       {/* ── Main ────────────────────────────────────────────── */}
       <div className={styles.main}>
-        {!selectedListId ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>↖</div>
-            <div className={styles.emptyText}>Select a list to review leads</div>
-          </div>
-        ) : (
-          <>
+        <>
             <div className={styles.listHeader}>
               <div className={styles.listHeaderTop}>
-                <span className={styles.listTitle}>{selectedList?.name}</span>
+                <span className={styles.listTitle}>{listName}</span>
               </div>
               <div className={styles.listSummary}>
                 <span>{stats.total} total</span>
@@ -332,8 +338,7 @@ export default function Leads() {
                 })}
               </motion.div>
             </AnimatePresence>
-          </>
-        )}
+        </>
       </div>
     </div>
   )

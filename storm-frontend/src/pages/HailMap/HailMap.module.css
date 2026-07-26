@@ -572,6 +572,123 @@
   word-break: break-word;
 }
 
+/* ── Swath summary ───────────────────────────── */
+.swathSummaryRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.swathSummaryNum {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.swathSummaryLabel {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+/* ── Storm Intel sidebar section ─────────────── */
+.swathFetchBtn {
+  width: 100%;
+  padding: 7px 12px;
+  background: rgba(64, 123, 167, 0.1);
+  border: 1px solid rgba(64, 123, 167, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.swathFetchBtn:hover:not(:disabled) {
+  background: rgba(64, 123, 167, 0.18);
+  border-color: rgba(64, 123, 167, 0.45);
+  color: var(--text-primary);
+}
+
+.swathFetchBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.swathCreditNote {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.swathErrText {
+  font-size: 0.6875rem;
+  color: #f87171;
+  line-height: 1.4;
+}
+
+.swathHint {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.stormList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.stormList::-webkit-scrollbar { display: none; }
+
+.stormRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.stormRow:hover { background: rgba(255,255,255,0.04); }
+
+.stormRowActive {
+  background: rgba(64, 123, 167, 0.1);
+  border-color: rgba(64, 123, 167, 0.25);
+}
+
+.stormSize {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+}
+
+.stormDate {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.stormProps {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* Dark-theme Leaflet popup */
 .mapWrapper :global(.leaflet-popup-content-wrapper) {
   background: #0d1830;

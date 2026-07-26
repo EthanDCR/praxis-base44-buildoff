@@ -8,4 +8,11 @@
 
 - on targets page have a daily running tracker for call results
 
-- use noaa just for reported hits and show them 
+- use noaa just for reported hits and show them
+
+- Storm notification system: as new hail events come in, show them as alerts/notifications on the
+  Storm Map with property count, max hail size, and affected area. When clicked, pull affected
+  properties through the Swath API, auto-generate a call list with pre-filled address + property
+  intel (roof age, sq ft, owner-occupancy), and make it available immediately on the Targets page.
+  Eventually: set up Swath monitors for your market territory so new storms trigger webhook →
+  auto-list creation without any manual steps.

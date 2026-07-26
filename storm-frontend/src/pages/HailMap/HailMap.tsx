@@ -1,17 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { base44 } from '../../lib/base44'
-import { MapContainer, TileLayer, useMap, useMapEvent } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap, useMapEvent, Rectangle, GeoJSON as GeoJSONLayer } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 import { motion, AnimatePresence } from 'motion/react'
-import HeatmapLayer from '../../components/HeatmapLayer/HeatmapLayer'
+import { fetchStorms, fetchSwathGeometry } from '../../lib/swath'
+import type { SwathStorm, SwathGeometry } from '../../lib/swath'
 import 'leaflet/dist/leaflet.css'
 import styles from './HailMap.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 const US_BOUNDS: LatLngBoundsExpression = [[15, -135], [58, -55]]
-const SWDI_BASE   = 'https://www.ncei.noaa.gov/swdiws/json/nx3hail'
-const IEM_BASE    = 'https://mesonet.agron.iastate.edu/geojson/lsr.php'
-const MIN_ZOOM_TO_FETCH = 7
+const NOMINATIM = 'https://nominatim.openstreetmap.org'
 
 const TILES = {
   dark: {
@@ -26,123 +25,6 @@ const TILES = {
   },
 }
 
-// ---------------------------------------------------------------------------
-// NOAA SWDI — NEXRAD Level-3 Hail Signatures
-// SHAPE: WKT "POINT (lon lat)", MAXSIZE: inches, PROB/SEVPROB: 0-100, ZTIME: ISO-8601
-// Max date range: 744 hours (~31 days). Fetched per map viewport.
-// ---------------------------------------------------------------------------
-
-interface SwdiRecord {
-  SHAPE:   string
-  MAXSIZE: string
-  PROB:    string
-  SEVPROB: string
-  ZTIME:   string
-  WSR_ID:  string
-  CELL_ID: string
-}
-
-interface IemFeature {
-  type: 'Feature'
-  geometry: { type: 'Point'; coordinates: [number, number] }
-  properties: { magnitude: number; valid: string; city: string; county: string; state: string; remark: string }
-}
-
-// Unified pool entry used for heatmap + hover
-interface PoolEntry {
-  lat:      number
-  lon:      number
-  size:     number   // hail size in inches
-  time:     string   // ISO-8601
-  source:   'swdi' | 'iem'
-  sevprob?: number   // swdi only
-  radar?:   string   // swdi only
-  label?:   string   // iem only
-}
-
-type HoverInfo = { entry: PoolEntry }
-
-interface ViewState {
-  north: number
-  south: number
-  east:  number
-  west:  number
-  zoom:  number
-}
-
-interface SelectedAddress {
-  display: string
-  line1:   string
-  line2:   string
-  lat:     number
-  lng:     number
-}
-
-// Parse WKT POINT — returns [lat, lon]
-function parsePoint(shape: string): [number, number] | null {
-  const m = shape.match(/POINT \(([^ ]+) ([^)]+)\)/)
-  if (!m) return null
-  return [parseFloat(m[2]), parseFloat(m[1])]
-}
-
-function swdiDate(d: Date) {
-  return d.toISOString().slice(0, 10).replace(/-/g, '')
-}
-
-function iemDate(d: Date) {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}`
-}
-
-function buildSwdiUrl(days: number, view: ViewState) {
-  const now   = new Date()
-  const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-  const bbox  = `${view.west.toFixed(3)},${view.south.toFixed(3)},${view.east.toFixed(3)},${view.north.toFixed(3)}`
-  return `${SWDI_BASE}/${swdiDate(start)}:${swdiDate(now)}?bbox=${bbox}`
-}
-
-function buildIemUrl(days: number) {
-  const now   = new Date()
-  const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-  return `${IEM_BASE}?sts=${iemDate(start)}&ets=${iemDate(now)}&type=H`
-}
-
-// IEM magnitudes are sometimes encoded as hundredths (75 → 0.75"). Cap at 2.5" to suppress bad reports.
-function normalizeIemSize(raw: number): number {
-  const n = raw > 10 ? raw / 100 : raw
-  return Math.min(n, 2.5)
-}
-
-function iemToEntry(f: IemFeature): PoolEntry | null {
-  const [lon, lat] = f.geometry.coordinates
-  const size = normalizeIemSize(f.properties.magnitude ?? 0)
-  if (!size) return null
-  const { valid, city, county, state } = f.properties
-  return { lat, lon, size, time: valid, source: 'iem', label: [city, county, state].filter(Boolean).join(', ') }
-}
-
-function swdiToEntry(r: SwdiRecord): PoolEntry | null {
-  const coord = parsePoint(r.SHAPE)
-  if (!coord) return null
-  return {
-    lat: coord[0], lon: coord[1],
-    size: parseFloat(r.MAXSIZE),
-    time: r.ZTIME,
-    source: 'swdi',
-    sevprob: parseInt(r.SEVPROB),
-    radar: r.WSR_ID,
-  }
-}
-
-function formatDate(ztime: string) {
-  try {
-    return new Date(ztime).toLocaleString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
-    })
-  } catch { return ztime }
-}
-
 const DATE_RANGES = [
   { label: 'Today',   days: 1  },
   { label: '3 Days',  days: 3  },
@@ -150,7 +32,27 @@ const DATE_RANGES = [
   { label: '30 Days', days: 30 },
 ]
 
-const NOMINATIM = 'https://nominatim.openstreetmap.org'
+function hailColor(size: number): string {
+  if (size >= 2.0)  return '#dc2626'
+  if (size >= 1.75) return '#ea580c'
+  if (size >= 1.5)  return '#f97316'
+  if (size >= 1.25) return '#f59e0b'
+  if (size >= 1.0)  return '#eab308'
+  if (size >= 0.75) return '#84cc16'
+  return '#22d3ee'
+}
+
+function hailLabel(size: number): string {
+  if (size >= 2.5)  return 'Baseball'
+  if (size >= 1.75) return 'Golf Ball'
+  if (size >= 1.5)  return 'Walnut'
+  if (size >= 1.0)  return 'Quarter'
+  if (size >= 0.75) return 'Penny'
+  return 'Marble'
+}
+
+interface ViewState { north: number; south: number; east: number; west: number; zoom: number }
+interface SelectedAddress { display: string; line1: string; line2: string; lat: number; lng: number }
 
 function MapController({ center }: { center: [number, number] | null }) {
   const map = useMap()
@@ -173,42 +75,17 @@ function MapClickHandler({ onAddress }: { onAddress: (addr: SelectedAddress) => 
       const line1 = [a.house_number, a.road].filter(Boolean).join(' ') || data.display_name?.split(',')[0]
       const line2 = [a.city || a.town || a.village, a.state].filter(Boolean).join(', ')
       onAddress({ display: data.display_name, line1, line2, lat, lng })
-    } catch { /* ignore */ }
+    } catch { }
   })
-  return null
-}
-
-function HoverTracker({ pool, onHover }: { pool: PoolEntry[]; onHover: (info: HoverInfo | null) => void }) {
-  const map = useMap()
-
-  useMapEvent('mousemove', (e) => {
-    if (pool.length === 0) { onHover(null); return }
-    const thresholdM = 40000 / Math.pow(2, map.getZoom() - 7)
-    let nearest: PoolEntry | null = null
-    let minDist = thresholdM
-    for (const entry of pool) {
-      const dist = e.latlng.distanceTo([entry.lat, entry.lon])
-      if (dist < minDist) { minDist = dist; nearest = entry }
-    }
-    onHover(nearest ? { entry: nearest } : null)
-  })
-
-  useMapEvent('mouseout', () => onHover(null))
   return null
 }
 
 function BoundsTracker({ onView }: { onView: (v: ViewState) => void }) {
   const map = useMap()
-
   const report = useCallback(() => {
     const b = map.getBounds()
-    onView({
-      north: b.getNorth(), south: b.getSouth(),
-      east:  b.getEast(),  west:  b.getWest(),
-      zoom:  map.getZoom(),
-    })
+    onView({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest(), zoom: map.getZoom() })
   }, [map, onView])
-
   useEffect(() => { report() }, [report])
   useMapEvent('moveend', report)
   useMapEvent('zoomend', report)
@@ -229,73 +106,138 @@ function SidebarSection({ children, delay }: { children: React.ReactNode; delay:
 }
 
 export default function HailMap() {
-  const [iemReports, setIemReports]     = useState<IemFeature[]>([])
-  const [swdiRecords, setSwdiRecords]   = useState<SwdiRecord[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [error, setError]               = useState<string | null>(null)
-  const [rangeDays, setRangeDays]       = useState(7)
-  const [viewState, setViewState]       = useState<ViewState | null>(null)
-  const [mapCenter, setMapCenter]       = useState<[number, number] | null>(null)
-  const [searchQuery, setSearchQuery]   = useState('')
-  const [searching, setSearching]       = useState(false)
-  const [suggestions, setSuggestions]   = useState<{ place_id: number; display_name: string; lat: string; lon: string }[]>([])
+  // ── Map state ─────────────────────────────────────────────────────
+  const [viewState, setViewState]   = useState<ViewState | null>(null)
+  const [mapCenter, setMapCenter]   = useState<[number, number] | null>(null)
+  const [tileMode, setTileMode]     = useState<'dark' | 'satellite'>('dark')
+
+  // ── Search ────────────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery]     = useState('')
+  const [searching, setSearching]         = useState(false)
+  const [suggestions, setSuggestions]     = useState<{ place_id: number; display_name: string; lat: string; lon: string }[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const searchWrapperRef = useRef<HTMLDivElement>(null)
-  const [tileMode, setTileMode]         = useState<'dark' | 'satellite'>('dark')
-  const [minSize, setMinSize]           = useState(1.0)
+
+  // ── Filters ───────────────────────────────────────────────────────
+  const [rangeDays, setRangeDays] = useState(7)
+  const [minSize, setMinSize]     = useState(1.0)
+
+  // ── Swath data ────────────────────────────────────────────────────
+  const [swathStorms, setSwathStorms]     = useState<SwathStorm[]>([])
+  const [swathGeoms, setSwathGeoms]       = useState<Record<string, SwathGeometry>>({})
+  const swathGeomsRef                     = useRef<Record<string, SwathGeometry>>({})
+  const [activeSwathId, setActiveSwathId] = useState<string | null>(null)
+  const [swathLoading, setSwathLoading]   = useState(false)
+  const [swathError, setSwathError]       = useState<string | null>(null)
+  const [swathCredits, setSwathCredits]   = useState(0)
+
+  // ── Property / list state ─────────────────────────────────────────
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
-  const [lists, setLists]                     = useState<{ id: string; name: string }[]>([])
-  const [activeListId, setActiveListId]       = useState<string | null>(null)
-  const [showNewList, setShowNewList]         = useState(false)
-  const [newListName, setNewListName]         = useState('')
-  const [creatingList, setCreatingList]       = useState(false)
-  const [showDropdown, setShowDropdown]       = useState(false)
-  const [addingTarget, setAddingTarget]       = useState(false)
-  const [addedFeedback, setAddedFeedback]     = useState(false)
-  const [hoveredInfo, setHoveredInfo]         = useState<HoverInfo | null>(null)
+  const [lists, setLists]               = useState<{ id: string; name: string }[]>([])
+  const [activeListId, setActiveListId] = useState<string | null>(null)
+  const [showNewList, setShowNewList]   = useState(false)
+  const [newListName, setNewListName]   = useState('')
+  const [creatingList, setCreatingList] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [addingTarget, setAddingTarget] = useState(false)
+  const [addedFeedback, setAddedFeedback] = useState(false)
 
-  const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Keep geom ref in sync with state so geometry handler can check cache without being in deps
+  useEffect(() => { swathGeomsRef.current = swathGeoms }, [swathGeoms])
 
-  // IEM nationwide overview — re-fetch when date range changes
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    fetch(buildIemUrl(rangeDays))
-      .then(r => { if (!r.ok) throw new Error(`IEM ${r.status}`); return r.json() })
-      .then(json => { if (!cancelled) setIemReports(json.features ?? []) })
-      .catch(e => { if (!cancelled) setError(e.message) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [rangeDays])
-
-  // SWDI radar — fetch viewport when zoomed in
-  useEffect(() => {
-    if (!viewState || viewState.zoom < MIN_ZOOM_TO_FETCH) {
-      setSwdiRecords([])
-      return
-    }
-    if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
-    fetchTimerRef.current = setTimeout(async () => {
-      setLoading(true)
-      try {
-        const res  = await fetch(buildSwdiUrl(rangeDays, viewState))
-        if (!res.ok) throw new Error(`SWDI ${res.status}`)
-        const data = await res.json()
-        setSwdiRecords(data.result ?? [])
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load radar data')
-      } finally {
-        setLoading(false)
-      }
-    }, 400)
-    return () => { if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current) }
-  }, [rangeDays, viewState])
-
+  // ── Load lists ────────────────────────────────────────────────────
   useEffect(() => {
     base44.entities.CallList.list().then((data: any) => setLists(data)).catch(console.error)
   }, [])
 
+  // ── Fetch storms + all geometries once per date-range change ─────────
+  useEffect(() => {
+    let cancelled = false
+    setSwathLoading(true)
+    setSwathError(null)
+    setSwathStorms([])
+    setSwathGeoms({})
+    swathGeomsRef.current = {}
+    setActiveSwathId(null)
+    setSwathCredits(0)
+
+    const since = new Date(Date.now() - rangeDays * 86400000).toISOString()
+
+    fetchStorms(since).then(storms => {
+      if (cancelled) return
+      setSwathStorms(storms)
+      setSwathCredits(1)
+
+      // Fire all geometry requests in parallel — draw polygons as each arrives
+      storms.forEach(s => {
+        if (!s.swath_id) return
+        fetchSwathGeometry(s.swath_id)
+          .then(geom => {
+            if (cancelled) return
+            setSwathGeoms(prev => ({ ...prev, [s.storm_id]: geom }))
+            setSwathCredits(c => c + 1)
+          })
+          .catch(() => {}) // silently skip if one fails (e.g. rate limit)
+      })
+    })
+    .catch(e => { if (!cancelled) setSwathError(e instanceof Error ? e.message : 'Failed') })
+    .finally(() => { if (!cancelled) setSwathLoading(false) })
+
+    return () => { cancelled = true }
+  }, [rangeDays])
+
+  // ── Search ────────────────────────────────────────────────────────
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node))
+        setShowSuggestions(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (q.length < 2) { setSuggestions([]); return }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${NOMINATIM}/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=us`,
+          { headers: { 'Accept-Language': 'en' } }
+        )
+        setSuggestions(await res.json())
+        setShowSuggestions(true)
+      } catch { }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const handleSearch = useCallback(async () => {
+    if (!searchQuery.trim()) return
+    setSearching(true)
+    setSuggestions([])
+    setShowSuggestions(false)
+    try {
+      const res     = await fetch(
+        `${NOMINATIM}/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=us`,
+        { headers: { 'Accept-Language': 'en' } }
+      )
+      const results = await res.json()
+      if (results.length > 0)
+        setMapCenter([parseFloat(results[0].lat), parseFloat(results[0].lon)])
+    } finally {
+      setSearching(false)
+    }
+  }, [searchQuery])
+
+  const handleSelectSuggestion = (s: { lat: string; lon: string; display_name: string }) => {
+    setMapCenter([parseFloat(s.lat), parseFloat(s.lon)])
+    setSearchQuery(s.display_name.split(',')[0])
+    setSuggestions([])
+    setShowSuggestions(false)
+  }
+
+  // ── List management ───────────────────────────────────────────────
   const handleCreateList = async () => {
     if (!newListName.trim() || creatingList) return
     setCreatingList(true)
@@ -332,72 +274,33 @@ export default function HailMap() {
     }
   }
 
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node))
-        setShowSuggestions(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [])
-
-  useEffect(() => {
-    const q = searchQuery.trim()
-    if (q.length < 2) { setSuggestions([]); return }
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `${NOMINATIM}/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=us`,
-          { headers: { 'Accept-Language': 'en' } }
-        )
-        setSuggestions(await res.json())
-        setShowSuggestions(true)
-      } catch { /* ignore */ }
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
-
-  const handleSearch = useCallback(async () => {
-    if (!searchQuery.trim()) return
-    setSearching(true)
-    setSuggestions([])
-    setShowSuggestions(false)
+  async function handleSelectStorm(stormId: string, swathId: string) {
+    setActiveSwathId(prev => prev === stormId ? null : stormId)
+    if (swathGeomsRef.current[stormId]) return
     try {
-      const res     = await fetch(
-        `${NOMINATIM}/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=us`,
-        { headers: { 'Accept-Language': 'en' } }
-      )
-      const results = await res.json()
-      if (results.length > 0)
-        setMapCenter([parseFloat(results[0].lat), parseFloat(results[0].lon)])
-    } finally {
-      setSearching(false)
+      const geom = await fetchSwathGeometry(swathId)
+      setSwathGeoms(prev => ({ ...prev, [stormId]: geom }))
+      setSwathCredits(c => c + 1)
+    } catch (e) {
+      console.error('Geometry load failed', e)
     }
-  }, [searchQuery])
-
-  const handleSelectSuggestion = (s: { lat: string; lon: string; display_name: string }) => {
-    setMapCenter([parseFloat(s.lat), parseFloat(s.lon)])
-    setSearchQuery(s.display_name.split(',')[0])
-    setSuggestions([])
-    setShowSuggestions(false)
   }
 
   const handleView = useCallback((v: ViewState) => setViewState(v), [])
 
-  const isHighZoom = viewState !== null && viewState.zoom >= MIN_ZOOM_TO_FETCH
-
-  // Build unified pool — use SWDI when zoomed in AND data has arrived, else IEM as fallback
-  const pool: PoolEntry[] = (isHighZoom && swdiRecords.length > 0)
-    ? swdiRecords.map(swdiToEntry).filter((e): e is PoolEntry => e !== null && e.size >= minSize)
-    : iemReports.map(iemToEntry).filter((e): e is PoolEntry => e !== null && e.size >= minSize)
-
-  const heatPoints = pool.map<[number, number, number]>(e => [
-    e.lat, e.lon, Math.min((e.size - 0.5) / 2.5, 1.0),
-  ])
-
-  const maxSize = pool.length > 0 ? Math.max(...pool.map(e => e.size)) : 0
-
-  const needsZoomIn = false // always show something — IEM at low zoom, SWDI at high
+  // Filter by min size + current viewport (so the sidebar only shows nearby storms)
+  const filteredStorms = swathStorms.filter(s => {
+    if ((s.mesh_max_in ?? 0) < minSize) return false
+    if (!viewState || !s.centroid_lon || !s.centroid_lat) return true
+    return (
+      s.centroid_lon >= viewState.west  && s.centroid_lon <= viewState.east &&
+      s.centroid_lat >= viewState.south && s.centroid_lat <= viewState.north
+    )
+  })
+  const allFiltered  = swathStorms.filter(s => (s.mesh_max_in ?? 0) >= minSize)
+  const activeStorm  = activeSwathId ? allFiltered.find(s => s.storm_id === activeSwathId) : null
+  const maxHail      = allFiltered.length > 0 ? Math.max(...allFiltered.map(s => s.mesh_max_in ?? 0)) : 0
+  const tooZoomedOut = false
 
   return (
     <div className={styles.page}>
@@ -411,26 +314,21 @@ export default function HailMap() {
       >
         <div className={styles.topBarLeft}>
           <span className={styles.pageTitle}>Storm Map</span>
-          {needsZoomIn && <span className={`${styles.badge} ${styles.badgeLoading}`}>Zoom in to load</span>}
-          {loading && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
-          {!loading && !error && (
-            <span className={`${styles.badge} ${styles.badgeLive}`}>
-              ● {isHighZoom && swdiRecords.length > 0 ? 'Radar' : 'Overview'}
-            </span>
+          {swathLoading && <span className={`${styles.badge} ${styles.badgeLoading}`}>Loading…</span>}
+          {!swathLoading && !swathError && filteredStorms.length > 0 && (
+            <span className={`${styles.badge} ${styles.badgeLive}`}>● Live</span>
           )}
-          {error && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {error}</span>}
-          {!loading && !error && pool.length > 0 && (
+          {swathError && <span className={`${styles.badge} ${styles.badgeError}`}>⚠ {swathError}</span>}
+          {!swathLoading && filteredStorms.length > 0 && (
             <span className={styles.strikeCount}>
-              <span className={styles.strikeNum}>{pool.length.toLocaleString()}</span>
+              <span className={styles.strikeNum}>{filteredStorms.length}</span>
               <span className={styles.strikeSub}>
-                {isHighZoom ? 'radar sigs' : 'reports'} · last {rangeDays}d · max {maxSize.toFixed(2)}"
+                storms · last {rangeDays}d · max {maxHail.toFixed(2)}"
               </span>
             </span>
           )}
-          {!isHighZoom && !loading && (
-            <span className={styles.strikeSub} style={{ marginLeft: 8 }}>Zoom in for radar precision</span>
-          )}
         </div>
+
         <div className={styles.searchRow}>
           <div className={styles.searchWrapper} ref={searchWrapperRef}>
             <input
@@ -493,7 +391,7 @@ export default function HailMap() {
         </SidebarSection>
 
         <SidebarSection delay={0.15}>
-          <h3 className={styles.sectionLabel}>Min Size</h3>
+          <h3 className={styles.sectionLabel}>Min Hail Size</h3>
           <div className={styles.rangeGrid}>
             {([0.75, 1.0, 1.5, 2.0] as const).map(s => (
               <button
@@ -508,6 +406,34 @@ export default function HailMap() {
         </SidebarSection>
 
         <SidebarSection delay={0.22}>
+          <h3 className={styles.sectionLabel}>Swaths</h3>
+          {swathLoading && <p className={styles.swathHint}>Loading storms…</p>}
+          {!swathLoading && swathStorms.length === 0 && (
+            <p className={styles.swathHint}>No storms in this date range</p>
+          )}
+          {swathStorms.length > 0 && (
+            <>
+              <div className={styles.swathSummaryRow}>
+                <span className={styles.swathSummaryNum}>{allFiltered.length}</span>
+                <span className={styles.swathSummaryLabel}>storms loaded</span>
+              </div>
+              <div className={styles.swathSummaryRow}>
+                <span className={styles.swathSummaryNum} style={{ color: hailColor(maxHail) }}>{maxHail.toFixed(2)}"</span>
+                <span className={styles.swathSummaryLabel}>largest hail</span>
+              </div>
+              <div className={styles.swathSummaryRow}>
+                <span className={styles.swathSummaryNum}>{Object.keys(swathGeoms).length}</span>
+                <span className={styles.swathSummaryLabel}>polygons drawn</span>
+              </div>
+              <p className={styles.swathHint} style={{ marginTop: 4 }}>Click any swath on the map for details</p>
+            </>
+          )}
+          {swathCredits > 0 && (
+            <p className={styles.swathCreditNote}>{swathCredits} credit{swathCredits !== 1 ? 's' : ''} used</p>
+          )}
+        </SidebarSection>
+
+        <SidebarSection delay={0.29}>
           <h3 className={styles.sectionLabel}>Active List</h3>
           {showNewList ? (
             <div className={styles.newListRow}>
@@ -529,7 +455,9 @@ export default function HailMap() {
                 onClick={() => lists.length > 0 && setShowDropdown(d => !d)}
               >
                 <span className={activeListId ? styles.listTriggerValue : styles.listTriggerPlaceholder}>
-                  {activeListId ? (lists.find(l => l.id === activeListId)?.name ?? 'Select a list…') : lists.length > 0 ? 'Select a list…' : 'No lists yet'}
+                  {activeListId
+                    ? (lists.find(l => l.id === activeListId)?.name ?? 'Select a list…')
+                    : lists.length > 0 ? 'Select a list…' : 'No lists yet'}
                 </span>
                 {lists.length > 0 && (
                   <span className={`${styles.listChevron} ${showDropdown ? styles.listChevronOpen : ''}`}>▾</span>
@@ -566,7 +494,7 @@ export default function HailMap() {
           )}
         </SidebarSection>
 
-        <SidebarSection delay={0.29}>
+        <SidebarSection delay={0.36}>
           <h3 className={styles.sectionLabel}>Selected Property</h3>
           {selectedAddress ? (
             <>
@@ -624,49 +552,62 @@ export default function HailMap() {
           <MapController center={mapCenter} />
           <MapClickHandler onAddress={setSelectedAddress} />
           <BoundsTracker onView={handleView} />
-          <HoverTracker pool={pool} onHover={setHoveredInfo} />
-          <HeatmapLayer points={heatPoints} />
+
+          {filteredStorms.map(s => {
+            const color   = hailColor(s.mesh_max_in ?? 0)
+            const active  = s.storm_id === activeSwathId
+            const geom    = swathGeoms[s.storm_id]
+            const onClick = () => handleSelectStorm(s.storm_id, s.swath_id)
+
+            if (geom) {
+              return (
+                <GeoJSONLayer
+                  key={s.storm_id}
+                  data={geom as GeoJSON.GeoJsonObject}
+                  style={{
+                    color,
+                    fillColor:   color,
+                    fillOpacity: active ? 0.38 : 0.2,
+                    weight:      active ? 2.5 : 1.5,
+                    opacity:     active ? 1.0 : 0.75,
+                  }}
+                  eventHandlers={{ click: onClick }}
+                />
+              )
+            }
+
+            return null
+          })}
         </MapContainer>
 
-        {!isHighZoom && pool.length > 0 && (
-          <div className={styles.zoomPrompt}>
-            Zoom in for radar-quality hail data
-          </div>
-        )}
-
+        {/* Active storm detail panel */}
         <AnimatePresence>
-          {hoveredInfo && (
+          {activeStorm && (
             <motion.div
-              key="hover"
+              key="swath-panel"
               className={styles.swathInfo}
               initial={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
               animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
               exit={{    opacity: 0, y: -4,  filter: 'blur(4px)' }}
               transition={{ duration: 0.18, ease: EASE }}
             >
-              <p className={styles.swathDate}>{formatDate(hoveredInfo.entry.time)}</p>
+              <p className={styles.swathDate}>
+                {new Date(activeStorm.started_at).toLocaleString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                  hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+                })}
+              </p>
               <div className={styles.swathSizeRow}>
-                <span className={styles.swathSize}>{hoveredInfo.entry.size.toFixed(2)}"</span>
-                <span className={styles.swathSizeLabel}>
-                  {hoveredInfo.entry.source === 'swdi' ? 'radar hail size' : 'reported hail size'}
+                <span className={styles.swathSize} style={{ color: hailColor(activeStorm.mesh_max_in ?? 0) }}>
+                  {(activeStorm.mesh_max_in ?? 0).toFixed(2)}"
                 </span>
+                <span className={styles.swathSizeLabel}>{hailLabel(activeStorm.mesh_max_in ?? 0)}</span>
               </div>
-              {hoveredInfo.entry.source === 'swdi' && hoveredInfo.entry.sevprob !== undefined && (
+              {activeStorm.area_km2 != null && (
                 <div className={styles.swathSizeRow}>
-                  <span className={styles.swathSize}>{hoveredInfo.entry.sevprob}%</span>
-                  <span className={styles.swathSizeLabel}>severe probability</span>
+                  <span className={styles.swathSize}>{Math.round(activeStorm.area_km2)}</span>
+                  <span className={styles.swathSizeLabel}>km² affected</span>
                 </div>
-              )}
-              {hoveredInfo.entry.radar && (
-                <p className={styles.swathLocation}>Radar: {hoveredInfo.entry.radar}</p>
-              )}
-              {hoveredInfo.entry.label && (
-                <p className={styles.swathLocation}>{hoveredInfo.entry.label}</p>
-              )}
-              {hoveredInfo.entry.source === 'iem' && (
-                <p className={styles.swathLocation} style={{ opacity: 0.5, fontSize: '0.7rem' }}>
-                  User-reported · zoom in for radar
-                </p>
               )}
             </motion.div>
           )}

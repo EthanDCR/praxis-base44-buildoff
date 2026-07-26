@@ -141,21 +141,32 @@ export default function SpeedDial() {
     return () => { device?.destroy() }
   }, [])
 
+  const [allTargets, setAllTargets] = useState<Target[]>([])
+
+  // Load everything once on mount
   useEffect(() => {
-    if (!activeListId) return
     setLoadingTargets(true)
-    setActiveId(null)
-    setTargets([])
-    setAutoDialing(false)
-    base44.entities.Target.filter({ list_id: activeListId })
+    base44.entities.Target.list()
       .then((d: any) => {
-        setTargets(d)
-        const first = d.find((t: Target) => t.status === 'new' || t.status === 'callback')
-        if (first) setActiveId(first.id)
+        setAllTargets(d)
+        const pool = d.filter((t: Target) => t.status === 'new' || t.status === 'callback')
+        if (pool[0]) setActiveId(pool[0].id)
       })
       .catch(console.error)
       .finally(() => setLoadingTargets(false))
-  }, [activeListId])
+  }, [])
+
+  // List filter is client-side
+  useEffect(() => {
+    const pool = activeListId
+      ? allTargets.filter(t => t.list_id === activeListId)
+      : allTargets
+    setTargets(pool)
+    setActiveId(null)
+    setAutoDialing(false)
+    const first = pool.find(t => t.status === 'new' || t.status === 'callback')
+    if (first) setActiveId(first.id)
+  }, [activeListId, allTargets])
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -383,7 +394,7 @@ export default function SpeedDial() {
           <div className={styles.listWrap} ref={listDropRef}>
             <button className={styles.listTrigger} onClick={() => setShowListDrop(d => !d)}>
               <span className={activeList ? styles.listVal : styles.listPlaceholder}>
-                {activeList ? activeList.name : 'Select list…'}
+                {activeList ? activeList.name : 'All Lists'}
               </span>
               <span className={`${styles.chevron} ${showListDrop ? styles.chevronOpen : ''}`}>▾</span>
             </button>
@@ -397,6 +408,13 @@ export default function SpeedDial() {
                   transition={{ duration: 0.18, ease: EASE }}
                   style={{ transformOrigin: 'top' }}
                 >
+                  <button
+                    className={`${styles.listOpt} ${!activeListId ? styles.listOptActive : ''}`}
+                    onClick={() => { setActiveListId(null); setShowListDrop(false) }}
+                  >
+                    {!activeListId && <span className={styles.listOptDot} />}
+                    All Lists
+                  </button>
                   {lists.map(l => (
                     <button
                       key={l.id}
@@ -413,7 +431,7 @@ export default function SpeedDial() {
           </div>
 
           <AnimatePresence>
-            {activeListId && !loadingTargets && (
+            {!loadingTargets && targets.length > 0 && (
               <motion.div className={styles.statRow}
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}
               >
@@ -469,8 +487,7 @@ export default function SpeedDial() {
           </div>
           <div className={styles.queueList}>
             {loadingTargets && <div className={styles.queueEmpty}>Loading…</div>}
-            {!loadingTargets && !activeListId && <div className={styles.queueEmpty}>Select a list above</div>}
-            {!loadingTargets && activeListId && visibleTargets.length === 0 && (
+            {!loadingTargets && visibleTargets.length === 0 && (
               <div className={styles.queueEmpty}>No targets in this filter</div>
             )}
             {!loadingTargets && visibleTargets.map(t => (
@@ -507,12 +524,7 @@ export default function SpeedDial() {
           {/* Target info */}
           <div className={styles.targetInfo}>
             <AnimatePresence mode="wait">
-              {!activeListId ? (
-                <motion.div key="no-list" className={styles.emptyState}
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  Select a list to start calling
-                </motion.div>
-              ) : loadingTargets ? (
+              {loadingTargets ? (
                 <motion.div key="loading" className={styles.emptyState}
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   Loading…
