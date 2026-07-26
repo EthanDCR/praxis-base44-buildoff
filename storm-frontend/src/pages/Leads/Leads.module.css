@@ -1,4 +1,415 @@
 .page {
+  display: flex;
+  height: calc(100vh - var(--nav-height));
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+.sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--surface-border);
+  overflow-y: auto;
+}
+
+.sidebarHeader {
+  padding: 16px 16px 12px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--surface-border);
+  flex-shrink: 0;
+}
+
+.listItems {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  position: relative;
+}
+
+.sidebarEmpty {
+  padding: 16px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* ── List card ───────────────────────────────────────────── */
+.listCard {
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  position: relative;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.listCard:hover { border-color: var(--surface-border-strong); }
+
+.listCardActive {
+  border-color: rgba(64,123,167,0.5);
+  background: rgba(64,123,167,0.08);
+}
+
+.listCardMain {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 12px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.listCardName {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.listCardActive .listCardName {
+  color: var(--text-primary);
+}
+
+.listCardMeta {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.listCardFooter {
+  padding: 4px 12px 10px;
+  position: relative;
+}
+
+/* ── Status button ───────────────────────────────────────── */
+.listStatusBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.12s;
+}
+
+.listStatusBtn:hover { opacity: 1; }
+
+.listStatusChevron {
+  font-size: 0.55rem;
+  opacity: 0.6;
+}
+
+.listStatusDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.listStatus_not_started { color: var(--text-muted); }
+.listStatus_in_progress { color: var(--text-secondary); }
+.listStatus_completed   { color: var(--text-muted); }
+.listStatus_on_hold     { color: var(--text-muted); }
+
+/* ── Dropdown ────────────────────────────────────────────── */
+.listStatusDrop {
+  position: absolute;
+  left: 14px;
+  top: calc(100% + 2px);
+  width: 150px;
+  background: var(--surface-raised);
+  border: 1px solid var(--surface-border-strong);
+  z-index: 50;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+}
+
+.listStatusOpt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--surface-border);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.listStatusOpt:last-child { border-bottom: none; }
+.listStatusOpt:hover { background: rgba(255,255,255,0.04); color: var(--text-secondary); }
+
+.listStatusOptActive { color: var(--text-primary); }
+
+.dot_not_started { opacity: 0.3; }
+.dot_in_progress { opacity: 0.7; }
+.dot_completed   { opacity: 0.5; }
+.dot_on_hold     { opacity: 0.4; }
+
+/* ── Main ────────────────────────────────────────────────── */
+.main {
   flex: 1;
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.emptyState {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+
+.emptyIcon { font-size: 1.25rem; opacity: 0.3; }
+.emptyText { font-size: 0.875rem; }
+
+/* ── List header ─────────────────────────────────────────── */
+.listHeader {
+  padding: 16px 24px 14px;
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.listHeaderTop {
+  margin-bottom: 6px;
+}
+
+.listTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.listSummary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.summaryDot { opacity: 0.35; }
+
+.progressTrack {
+  height: 2px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--blue-400);
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* ── Filter bar ──────────────────────────────────────────── */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--surface);
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.filterBar::-webkit-scrollbar { display: none; }
+
+.filterTab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.filterTab:hover {
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.03);
+}
+
+.filterTabActive {
+  background: rgba(64,123,167,0.1);
+  border-color: rgba(64,123,167,0.25);
+  color: var(--text-primary);
+}
+
+.filterCount {
+  background: rgba(255,255,255,0.07);
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ── Cards ───────────────────────────────────────────────── */
+.cards {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  align-content: start;
+}
+
+.loadingState {
+  grid-column: 1 / -1;
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Only callback and new get a visible left accent — everything else blends in */
+.card_callback { border-left: 2px solid rgba(245,158,11,0.5); }
+.card_new      { border-left: 2px solid rgba(64,123,167,0.4); }
+.card_called, .card_sold, .card_not_interested { opacity: 0.6; }
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardAddress { flex: 1; }
+
+.cardLine1 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.cardLine2 {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.statusPill {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.pill_new            { background: rgba(64,123,167,0.12);  color: var(--blue-400); }
+.pill_callback       { background: rgba(245,158,11,0.1);   color: #f59e0b; }
+.pill_sold           { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+.pill_called         { background: rgba(255,255,255,0.04); color: var(--text-muted); }
+.pill_not_interested { background: rgba(255,255,255,0.04); color: var(--text-muted); }
+
+.cardContact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contactName {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.contactRole {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.cardNote {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 2px;
+}
+
+.cardPhone {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dialBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(34,197,94,0.08);
+  border: 1px solid rgba(34,197,94,0.2);
+  border-radius: 6px;
+  color: #22c55e;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dialBtn:hover {
+  background: rgba(34,197,94,0.14);
+  border-color: rgba(34,197,94,0.35);
 }
