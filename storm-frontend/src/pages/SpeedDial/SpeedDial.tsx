@@ -700,24 +700,27 @@ export default function SpeedDial() {
                         </div>
                       ))
                     )}
-                  </div>
 
-                  <div className={styles.notesSection}>
-                    <div className={styles.notesSectionLabel}>Notes</div>
-                    <textarea
-                      className={styles.notesTextarea}
-                      placeholder="Add notes while prospecting…"
-                      rows={3}
-                      value={notesDraft}
-                      onChange={e => setNotesDraft(e.target.value)}
-                    />
-                    <button
-                      className={styles.notesSaveBtn}
-                      onClick={saveNote}
-                      disabled={noteSaving || notesDraft === (activeTarget.notes ?? '')}
-                    >
-                      {noteSaving ? 'Saving…' : 'Save Note'}
-                    </button>
+                    {/* Notes — inside the scroll so it doesn't shrink the contacts area */}
+                    <div className={styles.notesSection}>
+                      <div className={styles.notesSectionHeader}>
+                        <span className={styles.notesSectionLabel}>Notes</span>
+                        <button
+                          className={styles.notesSaveBtn}
+                          onClick={saveNote}
+                          disabled={noteSaving || notesDraft === (activeTarget.notes ?? '')}
+                        >
+                          {noteSaving ? 'Saving…' : 'Save'}
+                        </button>
+                      </div>
+                      <textarea
+                        className={styles.notesTextarea}
+                        placeholder="Add notes while prospecting…"
+                        rows={2}
+                        value={notesDraft}
+                        onChange={e => setNotesDraft(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </motion.div>
               )}

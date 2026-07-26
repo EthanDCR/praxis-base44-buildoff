@@ -31,36 +31,39 @@
 }
 
 .logoLottie {
-  height: 70px;
-  width: 120px;
+  height: 150px;
+  width: 130px;
   flex-shrink: 0;
   overflow: hidden;
+  filter: brightness(1.5) drop-shadow(0 0 10px rgba(64, 123, 167, 0.5));
 }
 
 .brandText {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-left: -30px;
+  gap: 5px;
+  margin-left: -35px;
+  margin-top: 10px;
 }
 
 .brandName {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 1.5rem;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-primary);
+  color: var(--text-muted);
   line-height: 1;
 }
 
 .brandTagline {
-  font-size: 0.5625rem;
+  font-size: 0.5rem;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding-left: 1px;
+  opacity: 0.45;
+  padding-left: 2px;
 }
 
 /* ── Nav links — plain text, no button chrome ── */

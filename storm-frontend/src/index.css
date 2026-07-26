@@ -24,13 +24,13 @@
   --text-secondary:  #a8c4de;
   --text-muted:      #6b90af;
 
-  --nav-height: 64px;
+  --nav-height: 72px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
 
   --font-ui:      'Space Grotesk', system-ui, sans-serif;
-  --font-display: 'Syne', system-ui, sans-serif;
+  --font-display: 'Orbitron', system-ui, sans-serif;
 
   font-family: var(--font-ui);
   font-size: 16px;
