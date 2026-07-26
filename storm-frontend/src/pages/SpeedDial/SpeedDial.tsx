@@ -36,6 +36,7 @@ type OutcomeOption =
   | 'lead_set'
   | 'scheduled_callback'
   | 'told_no'
+  | 'gate_keeper'
   | 'voicemail'
   | 'no_answer'
   | 'wrong_person'
@@ -46,6 +47,7 @@ const OUTCOME_LABEL: Record<OutcomeOption, string> = {
   lead_set:               'Inspection Set',
   scheduled_callback:     'Scheduled Callback',
   told_no:                'Told No',
+  gate_keeper:            'Gate Keeper',
   voicemail:              'Voicemail',
   no_answer:              'No Answer',
   wrong_person:           'Wrong Person',
@@ -57,11 +59,29 @@ const OUTCOME_TO_STATUS: Record<OutcomeOption, Target['status']> = {
   lead_set:               'sold',
   scheduled_callback:     'callback',
   told_no:                'not_interested',
+  gate_keeper:            'called',
   voicemail:              'called',
   no_answer:              'called',
   wrong_person:           'called',
   wrong_person_same_name: 'called',
   dead_number:            'called',
+}
+
+interface DailyStats { date: string; calls: number; dms: number; leads: number }
+
+function todayStr() { return new Date().toISOString().slice(0, 10) }
+
+function loadDailyStats(): DailyStats {
+  try {
+    const raw = localStorage.getItem('storm_daily_stats')
+    if (!raw) return { date: todayStr(), calls: 0, dms: 0, leads: 0 }
+    const parsed = JSON.parse(raw) as DailyStats
+    return parsed.date === todayStr() ? parsed : { date: todayStr(), calls: 0, dms: 0, leads: 0 }
+  } catch { return { date: todayStr(), calls: 0, dms: 0, leads: 0 } }
+}
+
+function saveDailyStats(s: DailyStats) {
+  localStorage.setItem('storm_daily_stats', JSON.stringify(s))
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -86,7 +106,16 @@ export default function SpeedDial() {
   // Outcome modal
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [outcomeSelection, setOutcomeSelection] = useState<OutcomeOption | null>(null)
-  const [outcomeNote, setOutcomeNote]           = useState('')
+
+  // Notes on the target card (independent from outcome logging)
+  const [notesDraft, setNotesDraft] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+
+  // Phone index tracker for multi-phone targets
+  const [activePhoneIdx, setActivePhoneIdx] = useState(0)
+
+  // Daily call tracker (persisted in localStorage, resets at midnight)
+  const [dailyStats, setDailyStats] = useState<DailyStats>(loadDailyStats)
 
   // Dialer
   const [twilioReady, setTwilioReady]     = useState(false)
@@ -202,6 +231,11 @@ export default function SpeedDial() {
   const activeTarget = targets.find(t => t.id === activeId) ?? null
   const activeList   = lists.find(l => l.id === activeListId)
 
+  // Sync notes draft whenever we switch to a different target
+  useEffect(() => {
+    setNotesDraft(activeTarget?.notes ?? '')
+  }, [activeId])
+
   const visibleTargets = filter === 'all' ? targets : targets.filter(t => t.status === filter)
 
   const stats = {
@@ -226,7 +260,6 @@ export default function SpeedDial() {
     activeCallRef.current = null
     resetCall()
     setOutcomeSelection(null)
-    setOutcomeNote('')
     setShowOutcomeModal(true)
   }
 
@@ -263,9 +296,24 @@ export default function SpeedDial() {
 
   function startAutoDialing() {
     setAutoDialing(true)
+    setActivePhoneIdx(0)
     const phone = activeTarget?.contacts?.[0]?.phones?.[0]
     const name  = activeTarget?.contacts?.[0]?.name ?? ''
     if (phone) initiateCall(phone, name)
+  }
+
+  async function saveNote() {
+    if (!activeId || noteSaving) return
+    setNoteSaving(true)
+    try {
+      await base44.entities.Target.update(activeId, { notes: notesDraft })
+      setTargets(prev => prev.map(t => t.id === activeId ? { ...t, notes: notesDraft } : t))
+      setAllTargets(prev => prev.map(t => t.id === activeId ? { ...t, notes: notesDraft } : t))
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setNoteSaving(false)
+    }
   }
 
   function stopAutoDialing() {
@@ -281,24 +329,50 @@ export default function SpeedDial() {
     if (!activeId) return
     const id     = activeId
     const status = OUTCOME_TO_STATUS[outcome]
-    const note   = outcomeNote.trim()
-      ? `${OUTCOME_LABEL[outcome]} — ${outcomeNote.trim()}`
-      : OUTCOME_LABEL[outcome]
+
+    // Multi-phone: try next number on same target before moving on
+    const currentTarget  = targets.find(t => t.id === id)
+    const allPhones      = currentTarget?.contacts?.[0]?.phones ?? []
+    const nextPhoneIdx   = activePhoneIdx + 1
+    const shouldTryNextPhone =
+      (outcome === 'voicemail' || outcome === 'no_answer' || outcome === 'dead_number') &&
+      nextPhoneIdx < allPhones.length
 
     setSaving(true)
     try {
-      await base44.entities.Target.update(id, { status, notes: note })
-      setTargets(prev => prev.map(t => t.id === id ? { ...t, status, notes: note } : t))
-      const next = findNext(id)
-      setActiveId(next?.id ?? null)
+      await base44.entities.Target.update(id, { status })
+      setTargets(prev => prev.map(t => t.id === id ? { ...t, status } : t))
+      setAllTargets(prev => prev.map(t => t.id === id ? { ...t, status } : t))
       setShowOutcomeModal(false)
       setOutcomeSelection(null)
-      setOutcomeNote('')
 
-      if (autoDialing && next) {
-        const phone = next.contacts?.[0]?.phones?.[0]
-        const name  = next.contacts?.[0]?.name ?? ''
-        if (phone) setTimeout(() => initiateCall(phone, name), 400)
+      // Update daily counters
+      const isDM   = outcome === 'told_no' || outcome === 'lead_set' || outcome === 'scheduled_callback'
+      const isLead = outcome === 'lead_set'
+      setDailyStats(prev => {
+        const next = { ...prev, calls: prev.calls + 1, dms: prev.dms + (isDM ? 1 : 0), leads: prev.leads + (isLead ? 1 : 0) }
+        saveDailyStats(next)
+        return next
+      })
+
+      if (shouldTryNextPhone) {
+        // Stay on same target, dial the next phone number
+        setActivePhoneIdx(nextPhoneIdx)
+        if (autoDialing) {
+          const phone = allPhones[nextPhoneIdx]
+          const name  = currentTarget?.contacts?.[0]?.name ?? ''
+          setTimeout(() => initiateCall(phone, name), 600)
+        }
+      } else {
+        // Advance to the next target
+        setActivePhoneIdx(0)
+        const next = findNext(id)
+        setActiveId(next?.id ?? null)
+        if (autoDialing && next) {
+          const phone = next.contacts?.[0]?.phones?.[0]
+          const name  = next.contacts?.[0]?.name ?? ''
+          if (phone) setTimeout(() => initiateCall(phone, name), 600)
+        }
       }
     } catch (e) {
       console.error(e)
@@ -351,6 +425,7 @@ export default function SpeedDial() {
                     className={[
                       styles.outcomeOption,
                       outcomeSelection === opt ? styles.outcomeOptionSelected : '',
+                      opt === 'dead_number' ? styles.outcomeOptionWide : '',
                     ].join(' ')}
                     onClick={() => setOutcomeSelection(opt)}
                   >
@@ -358,14 +433,6 @@ export default function SpeedDial() {
                   </button>
                 ))}
               </div>
-
-              <textarea
-                className={styles.modalNotes}
-                placeholder="Notes (optional)…"
-                rows={3}
-                value={outcomeNote}
-                onChange={e => setOutcomeNote(e.target.value)}
-              />
 
               <div className={styles.modalFooter}>
                 <button
@@ -394,7 +461,7 @@ export default function SpeedDial() {
           <div className={styles.listWrap} ref={listDropRef}>
             <button className={styles.listTrigger} onClick={() => setShowListDrop(d => !d)}>
               <span className={activeList ? styles.listVal : styles.listPlaceholder}>
-                {activeList ? activeList.name : 'All Lists'}
+                {activeList ? activeList.name : 'All Targets'}
               </span>
               <span className={`${styles.chevron} ${showListDrop ? styles.chevronOpen : ''}`}>▾</span>
             </button>
@@ -413,7 +480,7 @@ export default function SpeedDial() {
                     onClick={() => { setActiveListId(null); setShowListDrop(false) }}
                   >
                     {!activeListId && <span className={styles.listOptDot} />}
-                    All Lists
+                    All Targets
                   </button>
                   {lists.map(l => (
                     <button
@@ -430,21 +497,14 @@ export default function SpeedDial() {
             </AnimatePresence>
           </div>
 
-          <AnimatePresence>
-            {!loadingTargets && targets.length > 0 && (
-              <motion.div className={styles.statRow}
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}
-              >
-                <span className={styles.stat}><span className={styles.statNum}>{stats.total}</span> total</span>
-                <span className={styles.statDiv} />
-                <span className={styles.stat}><span className={styles.statNum}>{stats.new}</span> new</span>
-                <span className={styles.statDiv} />
-                <span className={styles.stat}><span className={styles.statNum}>{stats.callback}</span> callback</span>
-                <span className={styles.statDiv} />
-                <span className={styles.stat}><span className={styles.statNum}>{stats.sold}</span> inspections</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+        </div>
+
+        <div className={styles.dailyTracker}>
+          <span className={styles.stat}><span className={styles.statNum}>{dailyStats.calls}</span> calls</span>
+          <span className={styles.statDiv} />
+          <span className={styles.stat}><span className={styles.statNum}>{dailyStats.dms}</span> dm</span>
+          <span className={styles.statDiv} />
+          <span className={styles.stat}><span className={styles.statNum}>{dailyStats.leads}</span> leads</span>
         </div>
 
         {autoDialing ? (
@@ -629,12 +689,23 @@ export default function SpeedDial() {
                     )}
                   </div>
 
-                  {activeTarget.notes && (
-                    <div className={styles.prevNote}>
-                      <span className={styles.prevNoteLabel}>Last note</span>
-                      <span className={styles.prevNoteText}>{activeTarget.notes}</span>
-                    </div>
-                  )}
+                  <div className={styles.notesSection}>
+                    <div className={styles.notesSectionLabel}>Notes</div>
+                    <textarea
+                      className={styles.notesTextarea}
+                      placeholder="Add notes while prospecting…"
+                      rows={3}
+                      value={notesDraft}
+                      onChange={e => setNotesDraft(e.target.value)}
+                    />
+                    <button
+                      className={styles.notesSaveBtn}
+                      onClick={saveNote}
+                      disabled={noteSaving || notesDraft === (activeTarget.notes ?? '')}
+                    >
+                      {noteSaving ? 'Saving…' : 'Save Note'}
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

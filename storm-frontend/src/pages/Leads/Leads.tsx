@@ -32,8 +32,7 @@ interface CallList {
 
 type ListStatus   = 'not_started' | 'in_progress' | 'completed' | 'on_hold'
 type StatusFilter =
-  | 'all' | 'callback' | 'new' | 'sold' | 'not_interested'
-  | 'no_answer' | 'voicemail' | 'wrong_person' | 'dead_number' | 'told_no'
+  | 'all' | 'callback' | 'new' | 'called' | 'sold' | 'not_interested'
 
 const LIST_STATUSES: { value: ListStatus; label: string }[] = [
   { value: 'not_started', label: 'Not Started' },
@@ -53,37 +52,24 @@ const TARGET_STATUS_LABEL: Record<string, string> = {
 const STATUS_ORDER: Target['status'][] = ['callback', 'new', 'sold', 'called', 'not_interested']
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
-  { key: 'all',           label: 'All'           },
-  { key: 'callback',      label: 'Callback'      },
-  { key: 'new',           label: 'New'           },
-  { key: 'sold',          label: 'Inspection Set'},
-  { key: 'no_answer',     label: 'No Answer'     },
-  { key: 'voicemail',     label: 'Voicemail'     },
-  { key: 'told_no',       label: 'Told No'       },
-  { key: 'wrong_person',  label: 'Wrong Person'  },
-  { key: 'dead_number',   label: 'Dead Number'   },
-  { key: 'not_interested',label: 'Not Interested'},
+  { key: 'all',            label: 'All'           },
+  { key: 'callback',       label: 'Callback'      },
+  { key: 'new',            label: 'New'           },
+  { key: 'called',         label: 'Called'        },
+  { key: 'sold',           label: 'Inspection Set'},
+  { key: 'not_interested', label: 'Not Interested'},
 ]
-
-function noteStartsWith(notes: string | undefined, prefix: string) {
-  return notes?.startsWith(prefix) ?? false
-}
 
 function applyFilter(targets: Target[], filter: StatusFilter): Target[] {
   switch (filter) {
     case 'all':
       return [...targets].sort((a, b) =>
         STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status))
-    case 'callback':     return targets.filter(t => t.status === 'callback')
-    case 'new':          return targets.filter(t => t.status === 'new')
-    case 'sold':         return targets.filter(t => t.status === 'sold')
-    case 'not_interested': return targets.filter(t => t.status === 'not_interested')
-    case 'no_answer':    return targets.filter(t => noteStartsWith(t.notes, 'No Answer'))
-    case 'voicemail':    return targets.filter(t => noteStartsWith(t.notes, 'Voicemail'))
-    case 'told_no':      return targets.filter(t => noteStartsWith(t.notes, 'Told No'))
-    case 'wrong_person': return targets.filter(t =>
-      noteStartsWith(t.notes, 'Wrong Person'))
-    case 'dead_number':  return targets.filter(t => noteStartsWith(t.notes, 'Dead Number'))
+    case 'callback':      return targets.filter(t => t.status === 'callback')
+    case 'new':           return targets.filter(t => t.status === 'new')
+    case 'called':        return targets.filter(t => t.status === 'called')
+    case 'sold':          return targets.filter(t => t.status === 'sold')
+    case 'not_interested':return targets.filter(t => t.status === 'not_interested')
   }
 }
 
@@ -144,13 +130,9 @@ export default function Leads() {
     total:          targets.length,
     new:            targets.filter(t => t.status === 'new').length,
     callback:       targets.filter(t => t.status === 'callback').length,
+    called:         targets.filter(t => t.status === 'called').length,
     sold:           targets.filter(t => t.status === 'sold').length,
     not_interested: targets.filter(t => t.status === 'not_interested').length,
-    no_answer:      targets.filter(t => noteStartsWith(t.notes, 'No Answer')).length,
-    voicemail:      targets.filter(t => noteStartsWith(t.notes, 'Voicemail')).length,
-    told_no:        targets.filter(t => noteStartsWith(t.notes, 'Told No')).length,
-    wrong_person:   targets.filter(t => noteStartsWith(t.notes, 'Wrong Person')).length,
-    dead_number:    targets.filter(t => noteStartsWith(t.notes, 'Dead Number')).length,
   }
 
   const dialed = stats.total - stats.new

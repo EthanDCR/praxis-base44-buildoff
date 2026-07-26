@@ -30,9 +30,19 @@
   min-width: 0;
 }
 
+/* Daily tracker */
+.dailyTracker {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 0 16px;
+  border-left: 1px solid var(--surface-border);
+  border-right: 1px solid var(--surface-border);
+}
+
 /* Start / Stop dialing */
 .startBtn {
-  margin-left: auto;
   flex-shrink: 0;
   background: rgba(34, 197, 94, 0.1);
   border: 1px solid rgba(34, 197, 94, 0.3);
@@ -54,7 +64,6 @@
 .startBtn:disabled { opacity: 0.35; cursor: default; }
 
 .stopBtn {
-  margin-left: auto;
   flex-shrink: 0;
   background: none;
   border: 1px solid var(--surface-border);
@@ -609,17 +618,17 @@
 .modalSubmit:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
 .modalSubmit:disabled              { opacity: 0.3; cursor: default; }
 
-/* Previous call note strip */
-.prevNote {
+/* Notes section on target card */
+.notesSection {
   border-top: 1px solid var(--surface-border);
-  padding: 12px 28px;
+  padding: 14px 28px 16px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
-.prevNoteLabel {
+.notesSectionLabel {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -627,11 +636,42 @@
   color: var(--text-muted);
 }
 
-.prevNoteText {
+.notesTextarea {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
   font-size: 0.8125rem;
-  color: var(--text-secondary);
-  line-height: 1.45;
+  padding: 9px 12px;
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+  transition: border-color 0.15s;
 }
+
+.notesTextarea::placeholder { color: var(--text-muted); }
+.notesTextarea:focus { border-color: var(--surface-border-strong); }
+
+.notesSaveBtn {
+  align-self: flex-end;
+  background: none;
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 5px 12px;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.notesSaveBtn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--surface-border-strong);
+}
+
+.notesSaveBtn:disabled { opacity: 0.3; cursor: default; }
 
 /* ── Right panel (dialer + transcript) ───────────────────────────────────── */
 .rightPanel {
