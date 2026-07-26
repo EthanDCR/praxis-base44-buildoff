@@ -705,30 +705,45 @@
 
 /* Hail swath hover tooltip */
 .mapWrapper :global(.swathTooltip.leaflet-tooltip) {
-  background: rgba(10, 18, 40, 0.92);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  padding: 8px 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.55);
-  backdrop-filter: blur(8px);
+  background: var(--surface-raised);
+  border: 1px solid var(--surface-border-strong);
+  border-radius: var(--radius-md);
+  padding: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
   pointer-events: none;
+  min-width: 180px;
+  overflow: hidden;
 }
 
 .mapWrapper :global(.swathTooltip.leaflet-tooltip::before) {
   display: none;
 }
 
-.swathTipDate {
-  display: block;
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  letter-spacing: 0.03em;
-  margin-bottom: 2px;
+.swathTipRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--surface-border);
 }
 
-.swathTipSize {
-  display: block;
-  font-size: 0.875rem;
+.swathTipRow:last-child {
+  border-bottom: none;
+}
+
+.swathTipKey {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.swathTipVal {
+  font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  color: var(--text-primary);
+  text-align: right;
 }

@@ -41,14 +41,6 @@ function hailColor(size: number): string {
   return '#22d3ee'
 }
 
-function hailLabel(size: number): string {
-  if (size >= 2.5)  return 'Baseball'
-  if (size >= 1.75) return 'Golf Ball'
-  if (size >= 1.5)  return 'Walnut'
-  if (size >= 1.0)  return 'Quarter'
-  if (size >= 0.75) return 'Penny'
-  return 'Marble'
-}
 
 interface ViewState { north: number; south: number; east: number; west: number; zoom: number }
 interface SelectedAddress { display: string; line1: string; line2: string; lat: number; lng: number }
@@ -477,9 +469,17 @@ export default function HailMap() {
                     }}
                   >
                     <Tooltip sticky className={styles.swathTooltip}>
-                      <span className={styles.swathTipDate}>{dateLabel}</span>
-                      <span className={styles.swathTipSize} style={{ color }}>
-                        {f.hail_size_bin ?? `${f.min_size_inches}"`} · {hailLabel(f.min_size_inches)}
+                      <span className={styles.swathTipRow}>
+                        <span className={styles.swathTipKey}>DATE</span>
+                        <span className={styles.swathTipVal}>{dateLabel}</span>
+                      </span>
+                      <span className={styles.swathTipRow}>
+                        <span className={styles.swathTipKey}>HAIL SIZE</span>
+                        <span className={styles.swathTipVal} style={{ color }}>
+                          {f.min_size_inches >= 1
+                            ? `≥ ${f.min_size_inches.toFixed(2)} in`
+                            : `≥ ${(f.min_size_inches * 25.4).toFixed(0)} mm`}
+                        </span>
                       </span>
                     </Tooltip>
                   </GeoJSONLayer>
