@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { base44 } from '../../lib/base44'
-import { MapContainer, TileLayer, useMap, useMapEvent, GeoJSON as GeoJSONLayer, Tooltip } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap, useMapEvent, GeoJSON as GeoJSONLayer, Tooltip, CircleMarker } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 import type * as GeoJSON from 'geojson'
 import { motion, AnimatePresence } from 'motion/react'
+import { fetchHailReports, fetchStormCells } from '../../lib/xweather'
+import type { XWHailReport, XWStormCell } from '../../lib/xweather'
 import 'leaflet/dist/leaflet.css'
 import styles from './HailMap.module.css'
 
@@ -121,6 +123,27 @@ export default function HailMap() {
       .then((data: any) => setMrmsFeatures(Array.isArray(data) ? data : (data?.data ?? [])))
       .catch(console.error)
   }, [])
+
+  // ── XWeather layers ────────────────────────────────────────────────
+  const [xwReports, setXwReports]     = useState<XWHailReport[]>([])
+  const [xwCells, setXwCells]         = useState<XWStormCell[]>([])
+  const [xwLoading, setXwLoading]     = useState(false)
+  const [xwError, setXwError]         = useState<string | null>(null)
+
+  useEffect(() => {
+    setXwLoading(true)
+    setXwError(null)
+    Promise.all([
+      fetchHailReports(rangeDays, minSize),
+      fetchStormCells(),
+    ])
+      .then(([reports, cells]) => {
+        setXwReports(reports)
+        setXwCells(cells)
+      })
+      .catch(e => setXwError(e instanceof Error ? e.message : 'XWeather fetch failed'))
+      .finally(() => setXwLoading(false))
+  }, [rangeDays, minSize])
 
   // ── Property / list state ─────────────────────────────────────────
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
@@ -485,6 +508,84 @@ export default function HailMap() {
                   </GeoJSONLayer>
                 )
               } catch { return null }
+            })
+          }
+
+          {/* XWeather storm cells — live active cells with forecast cone polygons */}
+          {xwCells.map(cell => {
+            if (!cell.cone || cell.cone.length < 3) return null
+            const coneGeom: GeoJSON.GeoJsonObject = {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [cell.cone.map(([lon, lat]) => [lon, lat])],
+              },
+              properties: {},
+            } as GeoJSON.GeoJsonObject
+            return (
+              <GeoJSONLayer
+                key={`xw-cell-${cell.id}`}
+                data={coneGeom}
+                style={{ color: '#a78bfa', fillColor: '#a78bfa', fillOpacity: 0.15, weight: 1.5, opacity: 0.7 }}
+              >
+                <Tooltip sticky className={styles.swathTooltip}>
+                  <span className={styles.swathTipRow}>
+                    <span className={styles.swathTipKey}>SOURCE</span>
+                    <span className={styles.swathTipVal} style={{ color: '#a78bfa' }}>XWeather · Live Cell</span>
+                  </span>
+                  <span className={styles.swathTipRow}>
+                    <span className={styles.swathTipKey}>MAX HAIL</span>
+                    <span className={styles.swathTipVal} style={{ color: hailColor(cell.maxSizeIN) }}>
+                      {cell.maxSizeIN > 0 ? `${cell.maxSizeIN.toFixed(2)} in` : '—'}
+                    </span>
+                  </span>
+                  <span className={styles.swathTipRow}>
+                    <span className={styles.swathTipKey}>SEVERE PROB</span>
+                    <span className={styles.swathTipVal}>{cell.probSevere}%</span>
+                  </span>
+                </Tooltip>
+              </GeoJSONLayer>
+            )
+          })}
+
+          {/* XWeather storm reports — ground-truth confirmed hail (point markers) */}
+          {xwReports
+            .filter(r => r.hailIN >= minSize)
+            .map(r => {
+              const color = hailColor(r.hailIN)
+              const radius = Math.max(5, Math.min(14, r.hailIN * 6))
+              const dateLabel = r.dateISO
+                ? new Date(r.dateISO).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : '—'
+              return (
+                <CircleMarker
+                  key={`xw-report-${r.id}`}
+                  center={[r.lat, r.lon]}
+                  radius={radius}
+                  pathOptions={{ color, fillColor: color, fillOpacity: 0.75, weight: 1.5, opacity: 0.9 }}
+                >
+                  <Tooltip sticky className={styles.swathTooltip}>
+                    <span className={styles.swathTipRow}>
+                      <span className={styles.swathTipKey}>SOURCE</span>
+                      <span className={styles.swathTipVal} style={{ color: '#f59e0b' }}>XWeather · Confirmed</span>
+                    </span>
+                    <span className={styles.swathTipRow}>
+                      <span className={styles.swathTipKey}>DATE</span>
+                      <span className={styles.swathTipVal}>{dateLabel}</span>
+                    </span>
+                    <span className={styles.swathTipRow}>
+                      <span className={styles.swathTipKey}>HAIL SIZE</span>
+                      <span className={styles.swathTipVal} style={{ color }}>{r.hailIN.toFixed(2)} in</span>
+                    </span>
+                    {r.location && (
+                      <span className={styles.swathTipRow}>
+                        <span className={styles.swathTipKey}>LOCATION</span>
+                        <span className={styles.swathTipVal}>{r.location}, {r.state}</span>
+                      </span>
+                    )}
+                  </Tooltip>
+                </CircleMarker>
+              )
             })
           }
         </MapContainer>
