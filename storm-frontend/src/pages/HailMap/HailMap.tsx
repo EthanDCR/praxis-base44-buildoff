@@ -1,30 +1,30 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import * as maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
+import '@xweather/mapsgl/dist/mapsgl.css'
 import { base44 } from '../../lib/base44'
-import { MapContainer, TileLayer, useMap, useMapEvent, GeoJSON as GeoJSONLayer, Tooltip, CircleMarker } from 'react-leaflet'
-import type { LatLngBoundsExpression } from 'leaflet'
-import type * as GeoJSON from 'geojson'
 import { motion, AnimatePresence } from 'motion/react'
-import { fetchHailReports, fetchStormCells } from '../../lib/xweather'
-import type { XWHailReport, XWStormCell } from '../../lib/xweather'
-import 'leaflet/dist/leaflet.css'
+import { fetchHailReports } from '../../lib/xweather'
+import type { XWHailReport } from '../../lib/xweather'
 import styles from './HailMap.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
-const US_BOUNDS: LatLngBoundsExpression = [[15, -135], [58, -55]]
 const NOMINATIM = 'https://nominatim.openstreetmap.org'
+const XWEATHER_CLIENT_ID     = import.meta.env.VITE_XWEATHER_CLIENT_ID     as string
+const XWEATHER_CLIENT_SECRET = import.meta.env.VITE_XWEATHER_CLIENT_SECRET as string
 
-const TILES = {
-  dark: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
-  },
-  satellite: {
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: '&copy; <a href="https://www.esri.com/">Esri</a>',
-    subdomains: '',
-  },
-}
+const DARK_TILES = [
+  'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+  'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+  'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+  'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+]
+const SATELLITE_TILES = [
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+]
+const SATELLITE_LABEL_TILES = [
+  'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+]
 
 const DATE_RANGES = [
   { label: 'Today',   days: 1  },
@@ -43,47 +43,20 @@ function hailColor(size: number): string {
   return '#22d3ee'
 }
 
+const HAIL_COLOR_EXPR = [
+  'step', ['get', 'min_size_inches'],
+  '#22d3ee', 0.75, '#84cc16', 1.0, '#eab308',
+  1.25, '#f59e0b', 1.5, '#f97316', 1.75, '#ea580c', 2.0, '#dc2626',
+]
 
-interface ViewState { north: number; south: number; east: number; west: number; zoom: number }
+const HAIL_COLOR_EXPR_XW = [
+  'step', ['get', 'hailIN'],
+  '#22d3ee', 0.75, '#84cc16', 1.0, '#eab308',
+  1.25, '#f59e0b', 1.5, '#f97316', 1.75, '#ea580c', 2.0, '#dc2626',
+]
+
 interface SelectedAddress { display: string; line1: string; line2: string; lat: number; lng: number }
-
-function MapController({ center }: { center: [number, number] | null }) {
-  const map = useMap()
-  useEffect(() => {
-    if (center) map.flyTo(center, 10, { duration: 1.5 })
-  }, [center, map])
-  return null
-}
-
-function MapClickHandler({ onAddress }: { onAddress: (addr: SelectedAddress) => void }) {
-  useMapEvent('click', async (e) => {
-    const { lat, lng } = e.latlng
-    try {
-      const res  = await fetch(
-        `${NOMINATIM}/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
-        { headers: { 'Accept-Language': 'en' } }
-      )
-      const data = await res.json()
-      const a    = data.address ?? {}
-      const line1 = [a.house_number, a.road].filter(Boolean).join(' ') || data.display_name?.split(',')[0]
-      const line2 = [a.city || a.town || a.village, a.state].filter(Boolean).join(', ')
-      onAddress({ display: data.display_name, line1, line2, lat, lng })
-    } catch { }
-  })
-  return null
-}
-
-function BoundsTracker({ onView }: { onView: (v: ViewState) => void }) {
-  const map = useMap()
-  const report = useCallback(() => {
-    const b = map.getBounds()
-    onView({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest(), zoom: map.getZoom() })
-  }, [map, onView])
-  useEffect(() => { report() }, [report])
-  useMapEvent('moveend', report)
-  useMapEvent('zoomend', report)
-  return null
-}
+interface HoverInfo { x: number; y: number; props: Record<string, any>; kind: 'mrms' | 'xw' }
 
 function SidebarSection({ children, delay }: { children: React.ReactNode; delay: number }) {
   return (
@@ -99,53 +72,41 @@ function SidebarSection({ children, delay }: { children: React.ReactNode; delay:
 }
 
 export default function HailMap() {
-  // ── Map state ─────────────────────────────────────────────────────
-  const [viewState, setViewState]   = useState<ViewState | null>(null)
-  const [mapCenter, setMapCenter]   = useState<[number, number] | null>(null)
-  const [tileMode, setTileMode]     = useState<'dark' | 'satellite'>('dark')
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const mapRef        = useRef<maplibregl.Map | null>(null)
+  const controllerRef = useRef<any>(null)
+  const [mapLoaded, setMapLoaded] = useState(false)
 
-  // ── Search ────────────────────────────────────────────────────────
-  const [searchQuery, setSearchQuery]     = useState('')
-  const [searching, setSearching]         = useState(false)
-  const [suggestions, setSuggestions]     = useState<{ place_id: number; display_name: string; lat: string; lon: string }[]>([])
+  // ── Map UI state ────────────────────────────────────────
+  const [tileMode, setTileMode]   = useState<'dark' | 'satellite'>('dark')
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
+
+  // ── Search ──────────────────────────────────────────────
+  const [searchQuery, setSearchQuery]         = useState('')
+  const [searching, setSearching]             = useState(false)
+  const [suggestions, setSuggestions]         = useState<{ place_id: number; display_name: string; lat: string; lon: string }[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const searchWrapperRef = useRef<HTMLDivElement>(null)
 
-  // ── Filters ───────────────────────────────────────────────────────
+  // ── Filters ─────────────────────────────────────────────
   const [rangeDays, setRangeDays] = useState(7)
   const [minSize, setMinSize]     = useState(1.0)
 
-  // ── MRMS swath data (from hail pipeline → Base44) ─────────────────
+  // ── MRMS data ────────────────────────────────────────────
   const [mrmsFeatures, setMrmsFeatures] = useState<any[]>([])
-
   useEffect(() => {
     base44.entities.HailSwath.list()
       .then((data: any) => setMrmsFeatures(Array.isArray(data) ? data : (data?.data ?? [])))
       .catch(console.error)
   }, [])
 
-  // ── XWeather layers ────────────────────────────────────────────────
-  const [xwReports, setXwReports]     = useState<XWHailReport[]>([])
-  const [xwCells, setXwCells]         = useState<XWStormCell[]>([])
-  const [xwLoading, setXwLoading]     = useState(false)
-  const [xwError, setXwError]         = useState<string | null>(null)
-
+  // ── XWeather reports ─────────────────────────────────────
+  const [xwReports, setXwReports] = useState<XWHailReport[]>([])
   useEffect(() => {
-    setXwLoading(true)
-    setXwError(null)
-    Promise.all([
-      fetchHailReports(rangeDays, minSize),
-      fetchStormCells(),
-    ])
-      .then(([reports, cells]) => {
-        setXwReports(reports)
-        setXwCells(cells)
-      })
-      .catch(e => setXwError(e instanceof Error ? e.message : 'XWeather fetch failed'))
-      .finally(() => setXwLoading(false))
+    fetchHailReports(rangeDays, minSize).then(setXwReports).catch(console.error)
   }, [rangeDays, minSize])
 
-  // ── Property / list state ─────────────────────────────────────────
+  // ── Property / list state ────────────────────────────────
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
   const [lists, setLists]               = useState<{ id: string; name: string }[]>([])
   const [activeListId, setActiveListId] = useState<string | null>(null)
@@ -156,12 +117,181 @@ export default function HailMap() {
   const [addingTarget, setAddingTarget] = useState(false)
   const [addedFeedback, setAddedFeedback] = useState(false)
 
-  // ── Load lists ────────────────────────────────────────────────────
   useEffect(() => {
     base44.entities.CallList.list().then((data: any) => setLists(data)).catch(console.error)
   }, [])
 
-  // ── Search ────────────────────────────────────────────────────────
+  // ── GeoJSON memos ────────────────────────────────────────
+  const mrmsGeoJSON = useMemo(() => {
+    const cutoff = new Date(Date.now() - rangeDays * 86400000)
+    return {
+      type: 'FeatureCollection' as const,
+      features: mrmsFeatures.flatMap(f => {
+        if ((f.min_size_inches ?? 0) < minSize) return []
+        if (f.event_date && new Date(f.event_date) < cutoff) return []
+        try {
+          return [{
+            type: 'Feature' as const,
+            geometry: JSON.parse(f.geometry),
+            properties: { min_size_inches: f.min_size_inches ?? 0, event_date: f.event_date ?? '' },
+          }]
+        } catch { return [] }
+      }),
+    }
+  }, [mrmsFeatures, minSize, rangeDays])
+
+  const xwReportsGeoJSON = useMemo(() => ({
+    type: 'FeatureCollection' as const,
+    features: xwReports
+      .filter(r => r.hailIN >= minSize)
+      .map(r => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [r.lon, r.lat] },
+        properties: { id: r.id, hailIN: r.hailIN, dateISO: r.dateISO, location: r.location, state: r.state },
+      })),
+  }), [xwReports, minSize])
+
+  // ── Map init (once on mount) ─────────────────────────────
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: {
+        version: 8,
+        sources: {
+          'base-tiles': {
+            type: 'raster',
+            tiles: DARK_TILES,
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors © CARTO',
+          },
+        },
+        layers: [{ id: 'base', type: 'raster', source: 'base-tiles' }],
+      },
+      center: [-96, 37.5],
+      zoom: 4.5,
+      minZoom: 3,
+      maxZoom: 20,
+    })
+
+    map.addControl(new maplibregl.NavigationControl(), 'bottom-right')
+
+    map.on('load', async () => {
+      // Satellite label overlay (hidden by default)
+      map.addSource('sat-labels', { type: 'raster', tiles: SATELLITE_LABEL_TILES, tileSize: 256 })
+      map.addLayer({ id: 'sat-labels', type: 'raster', source: 'sat-labels', layout: { visibility: 'none' } })
+
+      // MRMS polygons
+      map.addSource('mrms', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addLayer({
+        id: 'mrms-fill', type: 'fill', source: 'mrms',
+        paint: { 'fill-color': HAIL_COLOR_EXPR as any, 'fill-opacity': 0.28 },
+      })
+      map.addLayer({
+        id: 'mrms-outline', type: 'line', source: 'mrms',
+        paint: { 'line-color': HAIL_COLOR_EXPR as any, 'line-width': 1.5, 'line-opacity': 0.85 },
+      })
+
+      // XWeather confirmed hail reports
+      map.addSource('xw-reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addLayer({
+        id: 'xw-reports-circle', type: 'circle', source: 'xw-reports',
+        paint: {
+          'circle-color': HAIL_COLOR_EXPR_XW as any,
+          'circle-radius': 5,
+          'circle-opacity': 0.85,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': 'rgba(255,255,255,0.2)',
+        },
+      })
+
+      setMapLoaded(true)
+
+      // MapsGL weather layers
+      try {
+        const mapsgl = await import('@xweather/mapsgl')
+        const account    = new mapsgl.Account(XWEATHER_CLIENT_ID, XWEATHER_CLIENT_SECRET)
+        const controller = new mapsgl.MaplibreMapController(map as any, { account })
+        controller.on('load', () => {
+          controller.addWeatherLayer('radar')
+          controller.addWeatherLayer('hail-size')
+        })
+        controllerRef.current = controller
+      } catch (e) {
+        console.warn('MapsGL unavailable:', e)
+      }
+    })
+
+    // Hover tooltip
+    map.on('mousemove', (e) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: ['mrms-fill', 'xw-reports-circle'] })
+      if (features.length) {
+        const f = features[0]
+        const kind = f.layer.id === 'mrms-fill' ? 'mrms' : 'xw'
+        setHoverInfo({ x: e.point.x, y: e.point.y, props: f.properties as Record<string, any>, kind })
+        map.getCanvas().style.cursor = 'crosshair'
+      } else {
+        setHoverInfo(null)
+        map.getCanvas().style.cursor = ''
+      }
+    })
+
+    map.on('mouseleave', () => {
+      setHoverInfo(null)
+      map.getCanvas().style.cursor = ''
+    })
+
+    // Click → reverse geocode
+    map.on('click', async (e) => {
+      const { lng, lat } = e.lngLat
+      try {
+        const res  = await fetch(
+          `${NOMINATIM}/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        )
+        const data = await res.json()
+        const a    = data.address ?? {}
+        const line1 = [a.house_number, a.road].filter(Boolean).join(' ') || data.display_name?.split(',')[0]
+        const line2 = [a.city || a.town || a.village, a.state].filter(Boolean).join(', ')
+        setSelectedAddress({ display: data.display_name, line1, line2, lat, lng })
+      } catch {}
+    })
+
+    mapRef.current = map
+
+    return () => {
+      try { controllerRef.current?.dispose?.() } catch {}
+      map.remove()
+      mapRef.current = null
+    }
+  }, [])
+
+  // ── Sync GeoJSON sources when data changes ───────────────
+  useEffect(() => {
+    const src = mapRef.current?.getSource('mrms') as maplibregl.GeoJSONSource | undefined
+    src?.setData(mrmsGeoJSON as any)
+  }, [mrmsGeoJSON, mapLoaded])
+
+  useEffect(() => {
+    const src = mapRef.current?.getSource('xw-reports') as maplibregl.GeoJSONSource | undefined
+    src?.setData(xwReportsGeoJSON as any)
+  }, [xwReportsGeoJSON, mapLoaded])
+
+  // ── Tile toggle ──────────────────────────────────────────
+  useEffect(() => {
+    if (!mapLoaded) return
+    const map = mapRef.current
+    if (!map) return
+    try {
+      (map.getSource('base-tiles') as any)?.setTiles(tileMode === 'satellite' ? SATELLITE_TILES : DARK_TILES)
+      if (map.getLayer('sat-labels')) {
+        map.setLayoutProperty('sat-labels', 'visibility', tileMode === 'satellite' ? 'visible' : 'none')
+      }
+    } catch {}
+  }, [tileMode, mapLoaded])
+
+  // ── Search ───────────────────────────────────────────────
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node))
@@ -182,37 +312,42 @@ export default function HailMap() {
         )
         setSuggestions(await res.json())
         setShowSuggestions(true)
-      } catch { }
+      } catch {}
     }, 300)
     return () => clearTimeout(timer)
   }, [searchQuery])
 
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return
-    setSearching(true)
-    setSuggestions([])
-    setShowSuggestions(false)
+    setSearching(true); setSuggestions([]); setShowSuggestions(false)
     try {
       const res     = await fetch(
         `${NOMINATIM}/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=us`,
         { headers: { 'Accept-Language': 'en' } }
       )
       const results = await res.json()
-      if (results.length > 0)
-        setMapCenter([parseFloat(results[0].lat), parseFloat(results[0].lon)])
-    } finally {
-      setSearching(false)
-    }
+      if (results.length > 0) {
+        mapRef.current?.flyTo({
+          center: [parseFloat(results[0].lon), parseFloat(results[0].lat)],
+          zoom: 10,
+          duration: 1500,
+        })
+      }
+    } finally { setSearching(false) }
   }, [searchQuery])
 
   const handleSelectSuggestion = (s: { lat: string; lon: string; display_name: string }) => {
-    setMapCenter([parseFloat(s.lat), parseFloat(s.lon)])
+    mapRef.current?.flyTo({
+      center: [parseFloat(s.lon), parseFloat(s.lat)],
+      zoom: 10,
+      duration: 1500,
+    })
     setSearchQuery(s.display_name.split(',')[0])
     setSuggestions([])
     setShowSuggestions(false)
   }
 
-  // ── List management ───────────────────────────────────────────────
+  // ── List management ──────────────────────────────────────
   const handleCreateList = async () => {
     if (!newListName.trim() || creatingList) return
     setCreatingList(true)
@@ -222,11 +357,8 @@ export default function HailMap() {
       setActiveListId(list.id)
       setNewListName('')
       setShowNewList(false)
-    } catch (e) {
-      console.error('Failed to create list', e)
-    } finally {
-      setCreatingList(false)
-    }
+    } catch (e) { console.error('Failed to create list', e) }
+    finally { setCreatingList(false) }
   }
 
   const handleAddTarget = async () => {
@@ -242,19 +374,64 @@ export default function HailMap() {
       })
       setAddedFeedback(true)
       setTimeout(() => setAddedFeedback(false), 2000)
-    } catch (e) {
-      console.error('Failed to add target', e)
-    } finally {
-      setAddingTarget(false)
-    }
+    } catch (e) { console.error('Failed to add target', e) }
+    finally { setAddingTarget(false) }
   }
 
-  const handleView = useCallback((v: ViewState) => setViewState(v), [])
+  // ── Tooltip renderer ─────────────────────────────────────
+  function renderTooltip(info: HoverInfo) {
+    if (info.kind === 'mrms') {
+      const size  = info.props.min_size_inches as number
+      const color = hailColor(size)
+      const dateLabel = info.props.event_date
+        ? new Date(info.props.event_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'Unknown date'
+      return (
+        <div className={styles.tipCard}>
+          <div className={styles.tipSourceBadge} style={{ color }}>NOAA · MRMS</div>
+          <div className={styles.tipRow}>
+            <span className={styles.tipKey}>DATE</span>
+            <span className={styles.tipVal}>{dateLabel}</span>
+          </div>
+          <div className={styles.tipRow}>
+            <span className={styles.tipKey}>HAIL SIZE</span>
+            <span className={styles.tipVal} style={{ color }}>
+              {size >= 1 ? `≥ ${size.toFixed(2)} in` : `≥ ${(size * 25.4).toFixed(0)} mm`}
+            </span>
+          </div>
+        </div>
+      )
+    }
+    const size  = info.props.hailIN as number
+    const color = hailColor(size)
+    const dateLabel = info.props.dateISO
+      ? new Date(info.props.dateISO).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '—'
+    return (
+      <div className={styles.tipCard}>
+        <div className={styles.tipSourceBadge} style={{ color: '#f59e0b' }}>XWeather · Confirmed</div>
+        <div className={styles.tipRow}>
+          <span className={styles.tipKey}>DATE</span>
+          <span className={styles.tipVal}>{dateLabel}</span>
+        </div>
+        <div className={styles.tipRow}>
+          <span className={styles.tipKey}>HAIL SIZE</span>
+          <span className={styles.tipVal} style={{ color }}>{size.toFixed(2)} in</span>
+        </div>
+        {info.props.location && (
+          <div className={styles.tipRow}>
+            <span className={styles.tipKey}>LOCATION</span>
+            <span className={styles.tipVal}>{info.props.location}, {info.props.state}</span>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className={styles.page}>
 
-      {/* ── Top bar ──────────────────────────────────────── */}
+      {/* ── Top bar ──────────────────────────────────── */}
       <motion.div
         className={styles.topBar}
         initial={{ y: -16, opacity: 0, filter: 'blur(8px)' }}
@@ -308,7 +485,7 @@ export default function HailMap() {
         </div>
       </motion.div>
 
-      {/* ── Sidebar ──────────────────────────────────────── */}
+      {/* ── Sidebar ──────────────────────────────────── */}
       <div className={styles.sidebar}>
 
         <SidebarSection delay={0.08}>
@@ -402,6 +579,7 @@ export default function HailMap() {
           )}
         </SidebarSection>
 
+
         <SidebarSection delay={0.36}>
           <h3 className={styles.sectionLabel}>Selected Property</h3>
           {selectedAddress ? (
@@ -423,173 +601,20 @@ export default function HailMap() {
 
       </div>
 
-      {/* ── Map ──────────────────────────────────────────── */}
+      {/* ── Map ──────────────────────────────────────── */}
       <motion.div
         className={styles.mapWrapper}
-        initial={{ opacity: 0, scale: 0.985, filter: 'blur(14px)' }}
-        animate={{ opacity: 1, scale: 1,     filter: 'blur(0px)'  }}
+        initial={{ opacity: 0, filter: 'blur(14px)' }}
+        animate={{ opacity: 1, filter: 'blur(0px)' }}
         transition={{ duration: 1.05, ease: EASE, delay: 0.1 }}
       >
-        <MapContainer
-          className={styles.map}
-          center={[37.5, -96]}
-          zoom={5}
-          minZoom={4}
-          maxZoom={20}
-          maxBounds={US_BOUNDS}
-          maxBoundsViscosity={1.0}
-          zoomControl={false}
-        >
-          <TileLayer
-            key={tileMode}
-            url={TILES[tileMode].url}
-            attribution={TILES[tileMode].attribution}
-            subdomains={TILES[tileMode].subdomains}
-            maxNativeZoom={19}
-            maxZoom={20}
-          />
-          {tileMode === 'satellite' && (
-            <TileLayer
-              url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-              attribution=""
-              maxNativeZoom={19}
-              maxZoom={20}
-            />
-          )}
+        <div ref={containerRef} className={styles.map} />
 
-          <MapController center={mapCenter} />
-          <MapClickHandler onAddress={setSelectedAddress} />
-          <BoundsTracker onView={handleView} />
-
-          {/* MRMS hail swath polygons from the hail pipeline */}
-          {mrmsFeatures
-            .filter(f => {
-              if ((f.min_size_inches ?? 0) < minSize) return false
-              if (f.event_date) {
-                const cutoff = new Date(Date.now() - rangeDays * 86400000)
-                const evDate = new Date(f.event_date)
-                if (evDate < cutoff) return false
-              }
-              return true
-            })
-            .map((f, i) => {
-              try {
-                const geometry = JSON.parse(f.geometry)
-                const color    = hailColor(f.min_size_inches)
-                const dateLabel = f.event_date
-                  ? new Date(f.event_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                  : 'Unknown date'
-                return (
-                  <GeoJSONLayer
-                    key={`mrms-${f.id ?? i}`}
-                    data={{ type: 'Feature', geometry, properties: {} } as GeoJSON.GeoJsonObject}
-                    style={{
-                      color,
-                      fillColor:   color,
-                      fillOpacity: 0.28,
-                      weight:      1.5,
-                      opacity:     0.85,
-                    }}
-                  >
-                    <Tooltip sticky className={styles.swathTooltip}>
-                      <span className={styles.swathTipRow}>
-                        <span className={styles.swathTipKey}>DATE</span>
-                        <span className={styles.swathTipVal}>{dateLabel}</span>
-                      </span>
-                      <span className={styles.swathTipRow}>
-                        <span className={styles.swathTipKey}>HAIL SIZE</span>
-                        <span className={styles.swathTipVal} style={{ color }}>
-                          {f.min_size_inches >= 1
-                            ? `≥ ${f.min_size_inches.toFixed(2)} in`
-                            : `≥ ${(f.min_size_inches * 25.4).toFixed(0)} mm`}
-                        </span>
-                      </span>
-                    </Tooltip>
-                  </GeoJSONLayer>
-                )
-              } catch { return null }
-            })
-          }
-
-          {/* XWeather storm cells — live active cells with forecast cone polygons */}
-          {xwCells.map(cell => {
-            if (!cell.cone || cell.cone.length < 3) return null
-            const coneGeom: GeoJSON.GeoJsonObject = {
-              type: 'Feature',
-              geometry: {
-                type: 'Polygon',
-                coordinates: [cell.cone.map(([lon, lat]) => [lon, lat])],
-              },
-              properties: {},
-            } as GeoJSON.GeoJsonObject
-            return (
-              <GeoJSONLayer
-                key={`xw-cell-${cell.id}`}
-                data={coneGeom}
-                style={{ color: '#a78bfa', fillColor: '#a78bfa', fillOpacity: 0.15, weight: 1.5, opacity: 0.7 }}
-              >
-                <Tooltip sticky className={styles.swathTooltip}>
-                  <span className={styles.swathTipRow}>
-                    <span className={styles.swathTipKey}>SOURCE</span>
-                    <span className={styles.swathTipVal} style={{ color: '#a78bfa' }}>XWeather · Live Cell</span>
-                  </span>
-                  <span className={styles.swathTipRow}>
-                    <span className={styles.swathTipKey}>MAX HAIL</span>
-                    <span className={styles.swathTipVal} style={{ color: hailColor(cell.maxSizeIN) }}>
-                      {cell.maxSizeIN > 0 ? `${cell.maxSizeIN.toFixed(2)} in` : '—'}
-                    </span>
-                  </span>
-                  <span className={styles.swathTipRow}>
-                    <span className={styles.swathTipKey}>SEVERE PROB</span>
-                    <span className={styles.swathTipVal}>{cell.probSevere}%</span>
-                  </span>
-                </Tooltip>
-              </GeoJSONLayer>
-            )
-          })}
-
-          {/* XWeather storm reports — ground-truth confirmed hail (point markers) */}
-          {xwReports
-            .filter(r => r.hailIN >= minSize)
-            .map(r => {
-              const color = hailColor(r.hailIN)
-              const radius = Math.max(5, Math.min(14, r.hailIN * 6))
-              const dateLabel = r.dateISO
-                ? new Date(r.dateISO).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                : '—'
-              return (
-                <CircleMarker
-                  key={`xw-report-${r.id}`}
-                  center={[r.lat, r.lon]}
-                  radius={radius}
-                  pathOptions={{ color, fillColor: color, fillOpacity: 0.75, weight: 1.5, opacity: 0.9 }}
-                >
-                  <Tooltip sticky className={styles.swathTooltip}>
-                    <span className={styles.swathTipRow}>
-                      <span className={styles.swathTipKey}>SOURCE</span>
-                      <span className={styles.swathTipVal} style={{ color: '#f59e0b' }}>XWeather · Confirmed</span>
-                    </span>
-                    <span className={styles.swathTipRow}>
-                      <span className={styles.swathTipKey}>DATE</span>
-                      <span className={styles.swathTipVal}>{dateLabel}</span>
-                    </span>
-                    <span className={styles.swathTipRow}>
-                      <span className={styles.swathTipKey}>HAIL SIZE</span>
-                      <span className={styles.swathTipVal} style={{ color }}>{r.hailIN.toFixed(2)} in</span>
-                    </span>
-                    {r.location && (
-                      <span className={styles.swathTipRow}>
-                        <span className={styles.swathTipKey}>LOCATION</span>
-                        <span className={styles.swathTipVal}>{r.location}, {r.state}</span>
-                      </span>
-                    )}
-                  </Tooltip>
-                </CircleMarker>
-              )
-            })
-          }
-        </MapContainer>
-
+        {hoverInfo && (
+          <div className={styles.hoverTip}>
+            {renderTooltip(hoverInfo)}
+          </div>
+        )}
       </motion.div>
 
     </div>

@@ -184,8 +184,8 @@ def extract_polygons_for_bin(mesh_inches, transform, threshold_inches):
 
         polygon = shape(geom_dict)  # convert dict to shapely geometry
 
-        # Skip tiny slivers (likely noise) — min 0.001 sq degrees (~10 km²)
-        if not polygon.is_valid or polygon.area < 0.001:
+        # Skip tiny slivers (likely noise) — min 0.005 sq degrees (~60 km²)
+        if not polygon.is_valid or polygon.area < 0.005:
             continue
 
         # Fix any self-intersections
@@ -195,6 +195,27 @@ def extract_polygons_for_bin(mesh_inches, transform, threshold_inches):
         polygons.append(polygon)
 
     return polygons
+
+
+def smooth_geometry(geom, simplify_tol=0.06, buffer_dist=0.12, resolution=32):
+    """
+    Remove grid-artifact right angles from a raster-traced polygon.
+
+    Step 1 — simplify: collapses the pixel-level stairstep vertices that
+    rasterio produces when tracing axis-aligned grid cell boundaries.
+
+    Step 2 — buffer round-trip: expands by buffer_dist with round joins,
+    then contracts by the same amount. The round join style replaces every
+    remaining sharp corner with a smooth curve, and the larger buffer_dist
+    merges nearby fragmented cells into cohesive storm-swath blobs.
+    """
+    geom = geom.simplify(simplify_tol, preserve_topology=True)
+    geom = (geom
+            .buffer( buffer_dist, resolution=resolution, join_style=1)
+            .buffer(-buffer_dist, resolution=resolution, join_style=1))
+    if not geom.is_valid:
+        geom = geom.buffer(0)
+    return geom
 
 
 def extract_all_bins(mesh_mm, lats, lons, bins):
@@ -219,24 +240,27 @@ def extract_all_bins(mesh_mm, lats, lons, bins):
         log.info(f"Extracting polygons for >= {threshold}\" …")
         polygons = extract_polygons_for_bin(mesh_inches, transform, threshold)
 
+        if not polygons:
+            continue
+
         # Merge overlapping polygons within the same bin into clean shapes
-        if polygons:
-            merged = unary_union(polygons)
-            # unary_union may return a single Polygon or a MultiPolygon —
-            # normalize to a list so we can loop over them
-            if hasattr(merged, "geoms"):
-                merged_list = list(merged.geoms)
-            else:
-                merged_list = [merged]
+        merged = unary_union(polygons)
+
+        # Smooth out the raster stairsteps and right-angle grid artifacts
+        merged = smooth_geometry(merged)
+
+        # Normalize to a flat list (unary_union returns Polygon or MultiPolygon)
+        if hasattr(merged, "geoms"):
+            merged_list = [g for g in merged.geoms if g.area >= 0.005]
         else:
-            merged_list = []
+            merged_list = [merged] if merged.area >= 0.005 else []
 
         log.info(f"  -> {len(merged_list)} polygon(s)")
 
         for poly in merged_list:
             features.append({
                 "type": "Feature",
-                "geometry": mapping(poly),  # shapely -> GeoJSON dict
+                "geometry": mapping(poly),
                 "properties": {
                     "hail_size_bin":   f'{threshold}"',
                     "min_size_inches": threshold,

@@ -33,3 +33,19 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+hail-pipeline/.venv/
+
+# Hail pipeline — raw GRIB2 data (large binary files, re-downloadable from NOAA S3)
+hail-pipeline/data/raw/*.grib2
+hail-pipeline/data/raw/*.grib2.gz
+*.idx
+
+# Local scripts / scratch files with hardcoded secrets
+script.js
+attom_response.json
+haillix-scraper/
