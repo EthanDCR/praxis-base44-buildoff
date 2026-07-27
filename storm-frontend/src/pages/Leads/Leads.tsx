@@ -3,6 +3,12 @@ import { motion, AnimatePresence } from 'motion/react'
 import { base44 } from '../../lib/base44'
 import styles from './Leads.module.css'
 
+const ChevronDown = () => (
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 3.5L5 6.5L8 3.5"/>
+  </svg>
+)
+
 const EASE = [0.22, 1, 0.36, 1] as const
 
 interface Contact {
@@ -33,13 +39,6 @@ interface CallList {
 type ListStatus   = 'not_started' | 'in_progress' | 'completed' | 'on_hold'
 type StatusFilter =
   | 'all' | 'callback' | 'new' | 'called' | 'sold' | 'not_interested'
-
-const LIST_STATUSES: { value: ListStatus; label: string }[] = [
-  { value: 'not_started', label: 'Not Started' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed',   label: 'Completed'   },
-  { value: 'on_hold',     label: 'On Hold'     },
-]
 
 const TARGET_STATUS_LABEL: Record<string, string> = {
   new:            'New',
@@ -74,13 +73,13 @@ function applyFilter(targets: Target[], filter: StatusFilter): Target[] {
 }
 
 export default function Leads() {
-  const [lists, setLists]               = useState<CallList[]>([])
+  const [lists, setLists]                   = useState<CallList[]>([])
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
-  const [allTargets, setAllTargets]     = useState<Target[]>([])
-  const [loading, setLoading]           = useState(false)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-  const dropdownRef                     = useRef<HTMLDivElement>(null)
+  const [allTargets, setAllTargets]         = useState<Target[]>([])
+  const [loading, setLoading]               = useState(false)
+  const [statusFilter, setStatusFilter]     = useState<StatusFilter>('all')
+  const [listPickerOpen, setListPickerOpen] = useState(false)
+  const listPickerRef                       = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     base44.entities.CallList.list().then((d: any) => setLists(d)).catch(console.error)
@@ -106,22 +105,12 @@ export default function Leads() {
 
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
-        setOpenDropdown(null)
+      if (listPickerRef.current && !listPickerRef.current.contains(e.target as Node))
+        setListPickerOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
-
-  async function setListStatus(listId: string, status: ListStatus) {
-    try {
-      await base44.entities.CallList.update(listId, { list_status: status })
-      setLists(prev => prev.map(l => l.id === listId ? { ...l, list_status: status } : l))
-    } catch (e) {
-      console.error(e)
-    }
-    setOpenDropdown(null)
-  }
 
   const selectedList = lists.find(l => l.id === selectedListId)
   const listName     = selectedList?.name ?? 'All Leads'
@@ -143,80 +132,50 @@ export default function Leads() {
   return (
     <div className={styles.page}>
 
-      {/* ── Sidebar ─────────────────────────────────────────── */}
-      <aside className={styles.sidebar}>
-        <div className={styles.sidebarHeader}>Filter by List</div>
-        <div className={styles.listItems} ref={dropdownRef}>
-          <motion.button
-            className={`${styles.listCard} ${styles.listCardMain} ${!selectedListId ? styles.listCardActive : ''}`}
-            onClick={() => { setSelectedListId(null); setStatusFilter('all') }}
-            initial={{ opacity: 0, x: -14, filter: 'blur(4px)' }}
-            animate={{ opacity: 1, x: 0,   filter: 'blur(0px)' }}
-            transition={{ duration: 0.4, ease: EASE }}
-          >
-            <span className={styles.listCardName}>All Lists</span>
-            <span className={styles.listCardMeta}>{allTargets.length} leads</span>
-          </motion.button>
-
-          {lists.map((l, i) => {
-            const ls         = l.list_status ?? 'not_started'
-            const lsDef      = LIST_STATUSES.find(s => s.value === ls)!
-            const isOpen     = openDropdown === l.id
-            const isSelected = l.id === selectedListId
-            const count      = allTargets.filter(t => t.list_id === l.id).length
-            return (
-              <motion.div
-                key={l.id}
-                initial={{ opacity: 0, x: -14, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, x: 0,   filter: 'blur(0px)' }}
-                transition={{ delay: (i + 1) * 0.05, duration: 0.4, ease: EASE }}
-                className={`${styles.listCard} ${isSelected ? styles.listCardActive : ''}`}
-              >
-                <button
-                  className={styles.listCardMain}
-                  onClick={() => { setSelectedListId(l.id); setStatusFilter('all') }}
-                >
-                  <span className={styles.listCardName}>{l.name}</span>
-                  <span className={styles.listCardMeta}>{count} leads</span>
-                </button>
-
-                <div className={styles.listCardFooter} ref={isOpen ? dropdownRef : null}>
-                  <button
-                    className={`${styles.listStatusBtn} ${styles[`listStatus_${ls}`]}`}
-                    onClick={e => { e.stopPropagation(); setOpenDropdown(isOpen ? null : l.id) }}
-                  >
-                    <span className={styles.listStatusDot} />
-                    {lsDef.label}
-                    <span className={styles.listStatusChevron}>▾</span>
-                  </button>
-
-                  {isOpen && (
-                    <div className={styles.listStatusDrop}>
-                      {LIST_STATUSES.map(s => (
-                        <button
-                          key={s.value}
-                          className={`${styles.listStatusOpt} ${ls === s.value ? styles.listStatusOptActive : ''}`}
-                          onClick={() => setListStatus(l.id, s.value)}
-                        >
-                          <span className={`${styles.listStatusDot} ${styles[`dot_${s.value}`]}`} />
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )
-          })}
-        </div>
-      </aside>
-
       {/* ── Main ────────────────────────────────────────────── */}
       <div className={styles.main}>
         <>
             <div className={styles.listHeader}>
               <div className={styles.listHeaderTop}>
                 <span className={styles.listTitle}>{listName}</span>
+
+                {/* ── List picker ── */}
+                <div className={styles.listPicker} ref={listPickerRef}>
+                  <button
+                    className={styles.listPickerBtn}
+                    onClick={() => setListPickerOpen(v => !v)}
+                  >
+                    Switch List
+                    <ChevronDown />
+                  </button>
+
+                  {listPickerOpen && (
+                    <div className={styles.listPickerDrop}>
+                      <button
+                        className={`${styles.listPickerOpt} ${!selectedListId ? styles.listPickerOptActive : ''}`}
+                        onClick={() => { setSelectedListId(null); setStatusFilter('all'); setListPickerOpen(false) }}
+                      >
+                        <span className={styles.listPickerOptName}>All Lists</span>
+                        <span className={styles.listPickerOptCount}>{allTargets.length}</span>
+                      </button>
+                      {lists.map(l => {
+                        const ls    = l.list_status ?? 'not_started'
+                        const count = allTargets.filter(t => t.list_id === l.id).length
+                        return (
+                          <button
+                            key={l.id}
+                            className={`${styles.listPickerOpt} ${l.id === selectedListId ? styles.listPickerOptActive : ''}`}
+                            onClick={() => { setSelectedListId(l.id); setStatusFilter('all'); setListPickerOpen(false) }}
+                          >
+                            <span className={`${styles.listStatusDot} ${styles[`dot_${ls}`]}`} />
+                            <span className={styles.listPickerOptName}>{l.name}</span>
+                            <span className={styles.listPickerOptCount}>{count}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className={styles.listSummary}>
                 <span>{stats.total} total</span>
