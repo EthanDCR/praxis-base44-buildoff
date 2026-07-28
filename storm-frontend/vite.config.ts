@@ -32,6 +32,11 @@ export default defineConfig(({ mode }) => {
           rewrite: path => path.replace(/^\/ihm-api/, '/ExternalApi'),
           headers: { Authorization: ihmAuth },
         },
+        '/twilio-token': {
+          target: 'https://praxis-base-dialer-4210.twil.io',
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/twilio-token/, '/token'),
+        },
       },
     },
   }

@@ -1,0 +1,6 @@
+- Notes from dealmachine webinar
+
+- 240 million properties 
+- fast interface
+- assuming api speed will be fast but thats not really an issue for us looking up single properties
+- 

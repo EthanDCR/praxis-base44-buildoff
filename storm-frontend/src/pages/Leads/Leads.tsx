@@ -36,48 +36,13 @@ interface CallList {
   list_status?: ListStatus
 }
 
-type ListStatus   = 'not_started' | 'in_progress' | 'completed' | 'on_hold'
-type StatusFilter =
-  | 'all' | 'callback' | 'new' | 'called' | 'sold' | 'not_interested'
-
-const TARGET_STATUS_LABEL: Record<string, string> = {
-  new:            'New',
-  called:         'Called',
-  callback:       'Callback',
-  not_interested: 'Not Interested',
-  sold:           'Inspection Set',
-}
-
-const STATUS_ORDER: Target['status'][] = ['callback', 'new', 'sold', 'called', 'not_interested']
-
-const FILTERS: { key: StatusFilter; label: string }[] = [
-  { key: 'all',            label: 'All'           },
-  { key: 'callback',       label: 'Callback'      },
-  { key: 'new',            label: 'New'           },
-  { key: 'called',         label: 'Called'        },
-  { key: 'sold',           label: 'Inspection Set'},
-  { key: 'not_interested', label: 'Not Interested'},
-]
-
-function applyFilter(targets: Target[], filter: StatusFilter): Target[] {
-  switch (filter) {
-    case 'all':
-      return [...targets].sort((a, b) =>
-        STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status))
-    case 'callback':      return targets.filter(t => t.status === 'callback')
-    case 'new':           return targets.filter(t => t.status === 'new')
-    case 'called':        return targets.filter(t => t.status === 'called')
-    case 'sold':          return targets.filter(t => t.status === 'sold')
-    case 'not_interested':return targets.filter(t => t.status === 'not_interested')
-  }
-}
+type ListStatus = 'not_started' | 'in_progress' | 'completed' | 'on_hold'
 
 export default function Leads() {
   const [lists, setLists]                   = useState<CallList[]>([])
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
   const [allTargets, setAllTargets]         = useState<Target[]>([])
   const [loading, setLoading]               = useState(false)
-  const [statusFilter, setStatusFilter]     = useState<StatusFilter>('all')
   const [listPickerOpen, setListPickerOpen] = useState(false)
   const listPickerRef                       = useRef<HTMLDivElement>(null)
 
@@ -98,11 +63,6 @@ export default function Leads() {
       .finally(() => setLoading(false))
   }, [])
 
-  // Client-side list filter
-  const targets = selectedListId
-    ? allTargets.filter(t => t.list_id === selectedListId)
-    : allTargets
-
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (listPickerRef.current && !listPickerRef.current.contains(e.target as Node))
@@ -112,173 +72,122 @@ export default function Leads() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // Leads page only shows appointments that have been set (sold = inspection set)
+  const soldTargets = allTargets.filter(t => t.status === 'sold')
+  const targets = selectedListId
+    ? soldTargets.filter(t => t.list_id === selectedListId)
+    : soldTargets
+
   const selectedList = lists.find(l => l.id === selectedListId)
   const listName     = selectedList?.name ?? 'All Leads'
 
-  const stats = {
-    total:          targets.length,
-    new:            targets.filter(t => t.status === 'new').length,
-    callback:       targets.filter(t => t.status === 'callback').length,
-    called:         targets.filter(t => t.status === 'called').length,
-    sold:           targets.filter(t => t.status === 'sold').length,
-    not_interested: targets.filter(t => t.status === 'not_interested').length,
-  }
-
-  const dialed = stats.total - stats.new
-  const pct    = stats.total > 0 ? Math.round((dialed / stats.total) * 100) : 0
-
-  const filtered = applyFilter(targets, statusFilter)
-
   return (
     <div className={styles.page}>
-
-      {/* ── Main ────────────────────────────────────────────── */}
       <div className={styles.main}>
         <>
-            <div className={styles.listHeader}>
-              <div className={styles.listHeaderTop}>
-                <span className={styles.listTitle}>{listName}</span>
+          <div className={styles.listHeader}>
+            <div className={styles.listHeaderTop}>
+              <span className={styles.listTitle}>{listName}</span>
 
-                {/* ── List picker ── */}
-                <div className={styles.listPicker} ref={listPickerRef}>
-                  <button
-                    className={styles.listPickerBtn}
-                    onClick={() => setListPickerOpen(v => !v)}
-                  >
-                    Switch List
-                    <ChevronDown />
-                  </button>
+              <div className={styles.listPicker} ref={listPickerRef}>
+                <button
+                  className={styles.listPickerBtn}
+                  onClick={() => setListPickerOpen(v => !v)}
+                >
+                  Switch List
+                  <ChevronDown />
+                </button>
 
-                  {listPickerOpen && (
-                    <div className={styles.listPickerDrop}>
-                      <button
-                        className={`${styles.listPickerOpt} ${!selectedListId ? styles.listPickerOptActive : ''}`}
-                        onClick={() => { setSelectedListId(null); setStatusFilter('all'); setListPickerOpen(false) }}
-                      >
-                        <span className={styles.listPickerOptName}>All Lists</span>
-                        <span className={styles.listPickerOptCount}>{allTargets.length}</span>
-                      </button>
-                      {lists.map(l => {
-                        const ls    = l.list_status ?? 'not_started'
-                        const count = allTargets.filter(t => t.list_id === l.id).length
-                        return (
-                          <button
-                            key={l.id}
-                            className={`${styles.listPickerOpt} ${l.id === selectedListId ? styles.listPickerOptActive : ''}`}
-                            onClick={() => { setSelectedListId(l.id); setStatusFilter('all'); setListPickerOpen(false) }}
-                          >
-                            <span className={`${styles.listStatusDot} ${styles[`dot_${ls}`]}`} />
-                            <span className={styles.listPickerOptName}>{l.name}</span>
-                            <span className={styles.listPickerOptCount}>{count}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className={styles.listSummary}>
-                <span>{stats.total} total</span>
-                <span className={styles.summaryDot}>·</span>
-                <span>{pct}% dialed</span>
-                <span className={styles.summaryDot}>·</span>
-                <span>{stats.callback} callbacks</span>
-                <span className={styles.summaryDot}>·</span>
-                <span>{stats.sold} inspections</span>
-              </div>
-              <div className={styles.progressTrack}>
-                <div className={styles.progressFill} style={{ width: `${pct}%` }} />
-              </div>
-            </div>
-
-            <div className={styles.filterBar}>
-              {FILTERS.filter(({ key }) => {
-                if (key === 'all') return true
-                const count = (stats as Record<string, number>)[key]
-                return count === undefined || count > 0 || statusFilter === key
-              }).map(({ key, label }) => {
-                const count = (stats as Record<string, number>)[key]
-                return (
-                  <button
-                    key={key}
-                    className={`${styles.filterTab} ${statusFilter === key ? styles.filterTabActive : ''}`}
-                    onClick={() => setStatusFilter(key)}
-                  >
-                    {label}
-                    {key !== 'all' && count !== undefined && (
-                      <span className={styles.filterCount}>{count}</span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={selectedListId + statusFilter}
-                className={styles.cards}
-                initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.35, ease: EASE }}
-              >
-                {loading && <div className={styles.loadingState}>Loading…</div>}
-                {!loading && filtered.length === 0 && (
-                  <div className={styles.emptyState}>
-                    <div className={styles.emptyText}>No contacts in this filter</div>
+                {listPickerOpen && (
+                  <div className={styles.listPickerDrop}>
+                    <button
+                      className={`${styles.listPickerOpt} ${!selectedListId ? styles.listPickerOptActive : ''}`}
+                      onClick={() => { setSelectedListId(null); setListPickerOpen(false) }}
+                    >
+                      <span className={styles.listPickerOptName}>All Lists</span>
+                      <span className={styles.listPickerOptCount}>{soldTargets.length}</span>
+                    </button>
+                    {lists.map(l => {
+                      const ls    = l.list_status ?? 'not_started'
+                      const count = soldTargets.filter(t => t.list_id === l.id).length
+                      return (
+                        <button
+                          key={l.id}
+                          className={`${styles.listPickerOpt} ${l.id === selectedListId ? styles.listPickerOptActive : ''}`}
+                          onClick={() => { setSelectedListId(l.id); setListPickerOpen(false) }}
+                        >
+                          <span className={`${styles.listStatusDot} ${styles[`dot_${ls}`]}`} />
+                          <span className={styles.listPickerOptName}>{l.name}</span>
+                          <span className={styles.listPickerOptCount}>{count}</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
-                {!loading && filtered.map((t, i) => {
-                  const c          = t.contacts?.[0]
-                  const phone      = c?.phones?.[0]
-                  const actionable = t.status === 'callback' || t.status === 'new'
-                  return (
-                    <motion.div
-                      key={t.id}
-                      className={`${styles.card} ${styles[`card_${t.status}`]}`}
-                      initial={{ opacity: 0, y: 10, filter: 'blur(3px)' }}
-                      animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
-                      transition={{ delay: Math.min(i * 0.04, 0.35), duration: 0.45, ease: EASE }}
-                    >
-                      <div className={styles.cardHead}>
-                        <div className={styles.cardAddress}>
-                          <div className={styles.cardLine1}>{t.line1}</div>
-                          {t.line2 && <div className={styles.cardLine2}>{t.line2}</div>}
-                        </div>
-                        <span className={`${styles.statusPill} ${styles[`pill_${t.status}`]}`}>
-                          {TARGET_STATUS_LABEL[t.status]}
-                        </span>
+              </div>
+            </div>
+            <div className={styles.listSummary}>
+              <span>{targets.length} inspection{targets.length !== 1 ? 's' : ''} set</span>
+            </div>
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedListId ?? 'all'}
+              className={styles.cards}
+              initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35, ease: EASE }}
+            >
+              {loading && <div className={styles.loadingState}>Loading…</div>}
+              {!loading && targets.length === 0 && (
+                <div className={styles.emptyState}>
+                  <div className={styles.emptyText}>No inspections set yet</div>
+                </div>
+              )}
+              {!loading && targets.map((t, i) => {
+                const c     = t.contacts?.[0]
+                const phone = c?.phones?.[0]
+                return (
+                  <motion.div
+                    key={t.id}
+                    className={styles.card}
+                    initial={{ opacity: 0, y: 10, filter: 'blur(3px)' }}
+                    animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
+                    transition={{ delay: Math.min(i * 0.04, 0.35), duration: 0.45, ease: EASE }}
+                  >
+                    <div className={styles.cardHead}>
+                      <div className={styles.cardAddress}>
+                        <div className={styles.cardLine1}>{t.line1}</div>
+                        {t.line2 && <div className={styles.cardLine2}>{t.line2}</div>}
                       </div>
+                      <span className={`${styles.statusPill} ${styles.pill_sold}`}>
+                        Inspection Set
+                      </span>
+                    </div>
 
-                      {c && (
-                        <div className={styles.cardContact}>
-                          <span className={styles.contactName}>{c.name}</span>
-                          {(c.title || c.company) && (
-                            <span className={styles.contactRole}>
-                              {[c.title, c.company].filter(Boolean).join(' · ')}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {t.notes && <div className={styles.cardNote}>{t.notes}</div>}
-
-                      <div className={styles.cardFoot}>
-                        {phone && <span className={styles.cardPhone}>{phone}</span>}
-                        {actionable && phone && (
-                          <button className={styles.dialBtn}>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/>
-                            </svg>
-                            Dial
-                          </button>
+                    {c && (
+                      <div className={styles.cardContact}>
+                        <span className={styles.contactName}>{c.name}</span>
+                        {(c.title || c.company) && (
+                          <span className={styles.contactRole}>
+                            {[c.title, c.company].filter(Boolean).join(' · ')}
+                          </span>
                         )}
                       </div>
-                    </motion.div>
-                  )
-                })}
-              </motion.div>
-            </AnimatePresence>
+                    )}
+
+                    {t.notes && <div className={styles.cardNote}>{t.notes}</div>}
+
+                    <div className={styles.cardFoot}>
+                      {phone && <span className={styles.cardPhone}>{phone}</span>}
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </motion.div>
+          </AnimatePresence>
         </>
       </div>
     </div>

@@ -139,28 +139,8 @@
 }
 
 .listSummary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 0.75rem;
   color: var(--text-muted);
-  margin-bottom: 10px;
-}
-
-.summaryDot { opacity: 0.35; }
-
-.progressTrack {
-  height: 2px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  background: var(--blue-400);
-  border-radius: 2px;
-  transition: width 0.5s ease;
 }
 
 /* ── Filter bar ──────────────────────────────────────────── */

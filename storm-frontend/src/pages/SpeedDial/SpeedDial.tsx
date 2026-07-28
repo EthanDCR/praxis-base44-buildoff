@@ -14,6 +14,8 @@ interface Contact {
   emails: string[]
 }
 
+type NumberQuality = 'good' | 'bad' | 'unsure'
+
 interface Target {
   id: string
   list_id: string
@@ -28,13 +30,14 @@ interface Target {
   year_built?: string
   contacts?: Contact[]
   status: 'new' | 'called' | 'callback' | 'not_interested' | 'sold'
+  number_quality?: NumberQuality
   notes?: string
 }
 
 interface CallList { id: string; name: string }
 interface Utterance { speaker: 'agent' | 'contact'; text: string; ts: number }
 
-type Filter       = 'all' | 'new' | 'callback'
+type Filter = 'all' | 'new' | 'callback' | 'called' | 'not_interested'
 type CallState    = 'idle' | 'active'
 type OutcomeOption =
   | 'lead_set'
@@ -165,8 +168,7 @@ export default function SpeedDial() {
 
   // Initialize Twilio Device
   useEffect(() => {
-    const tokenUrl = import.meta.env.VITE_TWILIO_TOKEN_URL
-    if (!tokenUrl) return
+    const tokenUrl = '/twilio-token'
 
     let device: Device
 
@@ -200,8 +202,10 @@ export default function SpeedDial() {
     setLoadingTargets(true)
     base44.entities.Target.list()
       .then((d: any) => {
-        setAllTargets(d)
-        const pool = d.filter((t: Target) => t.status === 'new' || t.status === 'callback')
+        // sold targets graduate to the Leads page — exclude them here
+        const working = d.filter((t: Target) => t.status !== 'sold')
+        setAllTargets(working)
+        const pool = working.filter((t: Target) => t.status === 'new' || t.status === 'callback')
         if (pool[0]) setActiveId(pool[0].id)
       })
       .catch(console.error)
@@ -290,11 +294,20 @@ export default function SpeedDial() {
   const visibleTargets = filter === 'all' ? targets : targets.filter(t => t.status === filter)
 
   const stats = {
-    total:    targets.length,
-    new:      targets.filter(t => t.status === 'new').length,
-    callback: targets.filter(t => t.status === 'callback').length,
-    sold:     targets.filter(t => t.status === 'sold').length,
+    total:          targets.length,
+    new:            targets.filter(t => t.status === 'new').length,
+    callback:       targets.filter(t => t.status === 'callback').length,
+    called:         targets.filter(t => t.status === 'called').length,
+    not_interested: targets.filter(t => t.status === 'not_interested').length,
   }
+
+  const FILTERS: { key: Filter; label: string; countKey?: keyof typeof stats }[] = [
+    { key: 'all',            label: 'All',          countKey: 'total'          },
+    { key: 'new',            label: 'New',          countKey: 'new'            },
+    { key: 'callback',       label: 'Callback',     countKey: 'callback'       },
+    { key: 'called',         label: 'Called',       countKey: 'called'         },
+    { key: 'not_interested', label: 'Not Interested', countKey: 'not_interested' },
+  ]
 
   function findNext(fromId: string): Target | null {
     const idx  = targets.findIndex(t => t.id === fromId)
@@ -365,6 +378,16 @@ export default function SpeedDial() {
     } finally {
       setNoteSaving(false)
     }
+  }
+
+  async function setNumberQuality(quality: NumberQuality | null) {
+    if (!activeId) return
+    const id = activeId
+    try {
+      await base44.entities.Target.update(id, { number_quality: quality ?? '' })
+      setTargets(prev => prev.map(t => t.id === id ? { ...t, number_quality: quality ?? undefined } : t))
+      setAllTargets(prev => prev.map(t => t.id === id ? { ...t, number_quality: quality ?? undefined } : t))
+    } catch (e) { console.error(e) }
   }
 
   function stopAutoDialing() {
@@ -585,13 +608,16 @@ export default function SpeedDial() {
         >
           <div className={styles.filterWrap}>
             <div className={styles.filterRow}>
-              {(['all', 'new', 'callback'] as Filter[]).map(f => (
+              {FILTERS.map(({ key, label, countKey }) => (
                 <button
-                  key={f}
-                  className={`${styles.filterBtn} ${filter === f ? styles.filterActive : ''}`}
-                  onClick={() => setFilter(f)}
+                  key={key}
+                  className={`${styles.filterBtn} ${filter === key ? styles.filterActive : ''}`}
+                  onClick={() => setFilter(key)}
                 >
-                  {f === 'all' ? 'All' : f === 'new' ? 'New' : 'Callback'}
+                  {label}
+                  {countKey && stats[countKey] > 0 && (
+                    <span className={styles.filterCount}>{stats[countKey]}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -767,6 +793,17 @@ export default function SpeedDial() {
                         >
                           {noteSaving ? 'Saving…' : 'Save'}
                         </button>
+                      </div>
+                      <div className={styles.numberQuality}>
+                        {(['good', 'unsure', 'bad'] as NumberQuality[]).map(q => (
+                          <button
+                            key={q}
+                            className={`${styles.nqBtn} ${styles[`nq_${q}`]} ${activeTarget.number_quality === q ? styles.nqActive : ''}`}
+                            onClick={() => setNumberQuality(activeTarget.number_quality === q ? null : q)}
+                          >
+                            {q === 'good' ? '✓ Good #' : q === 'bad' ? '✕ Bad #' : '? Unsure'}
+                          </button>
+                        ))}
                       </div>
                       <textarea
                         className={styles.notesTextarea}

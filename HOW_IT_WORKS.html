@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How This App Works</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d0f12;
+      color: #c9d1d9;
+      line-height: 1.7;
+      padding: 0 16px 80px;
+    }
+
+    .hero {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 64px 0 40px;
+      border-bottom: 1px solid #1e2329;
+    }
+
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin-bottom: 10px;
+    }
+
+    .hero p {
+      font-size: 1.05rem;
+      color: #8b949e;
+      max-width: 600px;
+    }
+
+    .tag {
+      display: inline-block;
+      background: rgba(56,139,253,0.12);
+      border: 1px solid rgba(56,139,253,0.25);
+      color: #58a6ff;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 18px;
+    }
+
+    .content {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin: 52px 0 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #1e2329;
+    }
+
+    h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #e6edf3;
+      margin: 28px 0 10px;
+    }
+
+    p { margin-bottom: 14px; color: #8b949e; }
+
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin: 16px 0;
+    }
+
+    .card h3 { margin-top: 0; }
+
+    .arch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 560px) { .arch { grid-template-columns: 1fr; } }
+
+    .arch-box {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .arch-box .label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #58a6ff;
+      margin-bottom: 6px;
+    }
+
+    .arch-box .title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 4px;
+    }
+
+    .arch-box p { font-size: 0.825rem; margin: 0; }
+
+    code {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 0.85em;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      padding: 1px 5px;
+      border-radius: 4px;
+      color: #e6edf3;
+    }
+
+    pre {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 18px 20px;
+      overflow-x: auto;
+      margin: 14px 0;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      color: #c9d1d9;
+    }
+
+    pre .comment { color: #484f58; }
+    pre .key     { color: #79c0ff; }
+    pre .val     { color: #a5d6ff; }
+    pre .str     { color: #a8daab; }
+
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 16px 0;
+    }
+
+    .flow-box {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #e6edf3;
+      white-space: nowrap;
+    }
+
+    .flow-arrow {
+      color: #30363d;
+      font-size: 1.1rem;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      margin-right: 4px;
+    }
+
+    .badge-noaa   { background: rgba(34,197,94,0.12);  color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+    .badge-xw     { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
+    .badge-b44    { background: rgba(56,139,253,0.12); color: #58a6ff; border: 1px solid rgba(56,139,253,0.2); }
+    .badge-local  { background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.2); }
+
+    .hail-scale {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin: 12px 0;
+    }
+
+    .hail-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-size: 0.775rem;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .toc {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin: 32px 0 0;
+    }
+
+    .toc ul {
+      list-style: none;
+      padding: 0;
+      columns: 2;
+    }
+
+    @media (max-width: 500px) { .toc ul { columns: 1; } }
+
+    .toc li { margin: 6px 0; }
+    .toc a { font-size: 0.875rem; }
+
+    .note {
+      background: rgba(245,158,11,0.06);
+      border-left: 3px solid rgba(245,158,11,0.4);
+      padding: 12px 16px;
+      border-radius: 0 6px 6px 0;
+      margin: 14px 0;
+      font-size: 0.875rem;
+      color: #8b949e;
+    }
+
+    .note strong { color: #fbbf24; }
+
+    ul.bullets {
+      padding-left: 20px;
+      color: #8b949e;
+      font-size: 0.9rem;
+    }
+
+    ul.bullets li { margin: 6px 0; }
+    ul.bullets li strong { color: #e6edf3; }
+  </style>
+</head>
+<body>
+
+  <div class="hero">
+    <div class="tag">Project Overview</div>
+    <h1>How This App Works</h1>
+    <p>A plain-English breakdown of the storm chasing / hail canvassing tool — what every piece does, where the data comes from, and how it all fits together.</p>
+  </div>
+
+  <div class="content">
+
+    <div class="toc">
+      <h3 style="margin-top:0; margin-bottom:12px;">Contents</h3>
+      <ul>
+        <li><a href="#bigpicture">The Big Picture</a></li>
+        <li><a href="#frontend">The Frontend</a></li>
+        <li><a href="#hailmap">Storm Map Page</a></li>
+        <li><a href="#leads">Leads Page</a></li>
+        <li><a href="#datasources">Data Sources</a></li>
+        <li><a href="#pipeline">The Hail Pipeline</a></li>
+        <li><a href="#base44">Base44 (Your Backend)</a></li>
+        <li><a href="#proxy">The Vite Proxy</a></li>
+        <li><a href="#hailscale">Hail Color Scale</a></li>
+        <li><a href="#env">Environment Variables</a></li>
+      </ul>
+    </div>
+
+
+    <!-- BIG PICTURE -->
+    <h2 id="bigpicture">The Big Picture</h2>
+
+    <p>This is a storm damage canvassing tool. The workflow is: find where hail hit → identify properties in that area → add them to a call list → work the list. Every part of the app feeds one of those steps.</p>
+
+    <div class="flow">
+      <div class="flow-box">NOAA Radar Data</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Python Pipeline</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Base44 Database</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box">Map / Leads UI</div>
+    </div>
+
+    <div class="arch">
+      <div class="arch-box">
+        <div class="label">Frontend</div>
+        <div class="title">storm-frontend/</div>
+        <p>React + Vite app. Three pages: Storm Map, Leads, Speed Dial. Talks to Base44 and external weather APIs.</p>
+      </div>
+      <div class="arch-box">
+        <div class="label">Backend / Database</div>
+        <div class="title">Base44</div>
+        <p>No-code backend that stores your data. You don't write any server code — Base44 gives you entities and a REST API automatically.</p>
+      </div>
+      <div class="arch-box">
+        <div class="label">Data Pipeline</div>
+        <div class="title">hail-pipeline/</div>
+        <p>Python scripts that pull raw radar files from NOAA's public AWS S3 bucket, convert them into map polygons, and push the results to Base44.</p>
+      </div>
+      <div class="arch-box">
+        <div class="label">External APIs</div>
+        <div class="title">XWeather + Nominatim</div>
+        <p>XWeather provides confirmed storm reports and live radar overlays. Nominatim (OpenStreetMap) handles address search and reverse geocoding.</p>
+      </div>
+    </div>
+
+
+    <!-- FRONTEND -->
+    <h2 id="frontend">The Frontend (<code>storm-frontend/</code>)</h2>
+
+    <p>Built with <strong>React</strong> and <strong>Vite</strong>. TypeScript throughout. Three routes wired up in <code>App.tsx</code>:</p>
+
+    <pre>/ → Storm Map (HailMap.tsx)
+/leads → Call list management (Leads.tsx)
+/speed-dial → Speed dial (SpeedDial.tsx)</pre>
+
+    <p>Each page is a self-contained folder under <code>src/pages/</code> with its own <code>.tsx</code> component and a <code>.module.css</code> file for scoped styles. CSS Modules mean the class names are auto-scoped per file — <code>.card</code> in Leads and <code>.card</code> in HailMap don't conflict.</p>
+
+    <p>Shared stuff lives in:</p>
+    <ul class="bullets">
+      <li><code>src/lib/base44.ts</code> — creates the Base44 client (one line)</li>
+      <li><code>src/lib/xweather.ts</code> — functions for fetching hail reports and storm cells from XWeather</li>
+      <li><code>src/lib/swath.ts</code> — fetches from a separate swath API (currently less used)</li>
+      <li><code>src/components/Navbar/</code> — the top nav bar</li>
+    </ul>
+
+    <div class="note">
+      <strong>Animations:</strong> The fade/blur entrance animations you see everywhere use <strong>Framer Motion</strong> (<code>motion/react</code>). The pattern is always the same: <code>initial</code> (blurred, offset) → <code>animate</code> (clear, in place), with a small <code>delay</code> to stagger items.
+    </div>
+
+
+    <!-- HAILMAP -->
+    <h2 id="hailmap">Storm Map Page (<code>HailMap.tsx</code>)</h2>
+
+    <p>This is the main page. It has two main sections: a left sidebar for controls and a full-screen map.</p>
+
+    <h3>The Map</h3>
+    <p>Powered by <strong>MapLibre GL</strong> — an open-source WebGL map renderer. Think of it like Google Maps but you control the data layers. The base tiles (the actual map imagery) come from CartoDB (dark mode) or ArcGIS (satellite).</p>
+
+    <p>Two data layers are drawn on the map:</p>
+    <ul class="bullets">
+      <li><span class="badge badge-noaa">NOAA</span> <strong>MRMS polygons</strong> — filled + outlined polygons showing where hail fell, sized by severity. These come from your Base44 database (processed by the pipeline).</li>
+      <li><span class="badge badge-xw">XWeather</span> <strong>Confirmed reports</strong> — colored dots from human spotters and storm reports. These are individual coordinate points, not polygons.</li>
+    </ul>
+
+    <p>On top of those, <strong>XWeather MapsGL</strong> adds live weather overlays (radar, hail-size layer) via their SDK. This loads asynchronously after the base map is ready.</p>
+
+    <h3>Click to Select a Property</h3>
+    <p>Clicking anywhere on the map fires a <strong>reverse geocode</strong> request to Nominatim (OpenStreetMap's free geocoding service). It takes the lat/lon you clicked and returns a human-readable address. That address shows up in the sidebar's "Selected Property" section, where you can add it to a call list.</p>
+
+    <h3>Filters</h3>
+    <ul class="bullets">
+      <li><strong>Date Range</strong> — filters both the MRMS polygons and XWeather reports to the last N days. Done client-side for MRMS (data is already loaded), API-side for XWeather.</li>
+      <li><strong>Min Hail Size</strong> — hides anything below the chosen size threshold.</li>
+    </ul>
+
+    <h3>The Active List</h3>
+    <p>The sidebar has a "Active List" dropdown. This is which call list you're currently adding properties to. You can create a new list or pick an existing one. When you click "+ Add to List," it creates a <code>Target</code> record in Base44 under that list.</p>
+
+
+    <!-- LEADS -->
+    <h2 id="leads">Leads Page (<code>Leads.tsx</code>)</h2>
+
+    <p>This is your call list management page. All data lives in Base44 — nothing is stored locally.</p>
+
+    <ul class="bullets">
+      <li><strong>Switch List</strong> button (top right of the header) — dropdown to filter the view to a specific call list.</li>
+      <li><strong>Active list name</strong> shows on the left of the header. "All Leads" means you're viewing everything.</li>
+      <li><strong>Filter tabs</strong> — filter cards by status: All, Callback, New, Called, Inspection Set, Not Interested.</li>
+      <li><strong>Progress bar</strong> — shows what % of the list has been dialed (anything that's not "New").</li>
+      <li><strong>Cards</strong> — each card is a Target (a property/contact). Orange left-border = callback, blue = new. Called / sold / not interested go slightly faded.</li>
+    </ul>
+
+    <p>The data is fetched once on mount and filtered client-side. No re-fetch when you switch lists or filters — it's all already in memory.</p>
+
+
+    <!-- DATA SOURCES -->
+    <h2 id="datasources">Data Sources</h2>
+
+    <div class="card">
+      <span class="badge badge-noaa">NOAA</span>
+      <h3>MRMS MESH — Radar-derived hail polygons</h3>
+      <p><strong>MRMS</strong> (Multi-Radar Multi-Sensor) is NOAA's national radar network. <strong>MESH</strong> (Maximum Estimated Size of Hail) is a product that estimates the largest hail size at each point on the ground, derived from radar reflectivity. NOAA publishes this as GRIB2 files (a meteorological data format) on a public AWS S3 bucket, updated every 2 minutes.</p>
+      <p>Your Python pipeline downloads these files, composites a full day into a single "worst hail per location" grid, extracts polygons where hail exceeded certain thresholds, and stores them in Base44. These become the colored polygon shapes on the map.</p>
+    </div>
+
+    <div class="card">
+      <span class="badge badge-xw">XWeather</span>
+      <h3>XWeather (AerisWeather) — Confirmed reports &amp; live radar</h3>
+      <p>XWeather is a commercial weather data provider. You use two things from them:</p>
+      <ul class="bullets" style="margin-top:8px;">
+        <li><strong>Storm Reports API</strong> — human-confirmed hail sightings from spotters, emergency managers, and NWS reports. These are the colored dots on the map. Filtered by size and date range.</li>
+        <li><strong>MapsGL SDK</strong> — their JavaScript SDK that renders live radar and hail-size overlays directly onto the MapLibre map. This requires a client ID and secret.</li>
+      </ul>
+      <p>API calls go through the Vite proxy (see below) to keep your credentials out of the browser.</p>
+    </div>
+
+    <div class="card">
+      <span class="badge badge-local">OSM</span>
+      <h3>Nominatim — Address search &amp; reverse geocoding</h3>
+      <p>Nominatim is OpenStreetMap's free geocoding service. The app uses it for two things: (1) the address search bar autocomplete, and (2) reverse geocoding when you click the map — turning lat/lon into a readable address. No API key required, but there's a usage policy (no heavy bulk use).</p>
+    </div>
+
+    <div class="card">
+      <span class="badge badge-b44">Base44</span>
+      <h3>Base44 — Your database &amp; backend</h3>
+      <p>Base44 is a no-code backend platform. Instead of writing a Node/Python server and database schema, you define "entities" in Base44's dashboard and it gives you a REST API automatically. The SDK client in <code>src/lib/base44.ts</code> handles authentication.</p>
+      <p>Your three entities:</p>
+      <ul class="bullets" style="margin-top:8px;">
+        <li><strong>HailSwath</strong> — one record per polygon per day. Stores the GeoJSON geometry, hail size, and event date. Read by the map.</li>
+        <li><strong>CallList</strong> — a named list (e.g. "Appleton WI July 2026"). Has a status: not started, in progress, completed, on hold.</li>
+        <li><strong>Target</strong> — a property/contact inside a list. Has an address, contact info, status (new/called/callback/sold/not_interested), and notes.</li>
+      </ul>
+    </div>
+
+
+    <!-- PIPELINE -->
+    <h2 id="pipeline">The Hail Pipeline (<code>hail-pipeline/</code>)</h2>
+
+    <p>This is a set of Python scripts you run manually (or could schedule) to pull fresh data. There are four scripts:</p>
+
+    <div class="flow" style="flex-direction:column; align-items:flex-start; gap:6px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="flow-box" style="width:160px; text-align:center;">fetch_mrms.py</div>
+        <span style="color:#8b949e; font-size:0.85rem;">Downloads GRIB2 files from NOAA's public S3 bucket. Decompresses them. Skips files you already have (cached).</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; padding-left:20px; color:#30363d; font-size:1.2rem;">↓</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="flow-box" style="width:160px; text-align:center;">process_mesh.py</div>
+        <span style="color:#8b949e; font-size:0.85rem;">Loads all the GRIB2 files for a day. Takes the <em>maximum</em> hail value at each grid cell across all time steps. Converts mm → inches, then traces polygon boundaries around hail threshold zones. Smooths the jagged raster edges into clean shapes. Outputs GeoJSON.</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; padding-left:20px; color:#30363d; font-size:1.2rem;">↓</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="flow-box" style="width:160px; text-align:center;">push_to_base44.py</div>
+        <span style="color:#8b949e; font-size:0.85rem;">Takes the GeoJSON and POSTs each polygon as a HailSwath record in Base44.</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; padding-left:20px; color:#30363d; font-size:1.2rem;">↓</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="flow-box" style="width:160px; text-align:center;">run.py</div>
+        <span style="color:#8b949e; font-size:0.85rem;">Orchestrates the above three. You run this one. Supports single-day or multi-day backfill.</span>
+      </div>
+    </div>
+
+    <h3>Important: <code>--step</code> flag</h3>
+    <p>NOAA publishes a new GRIB2 file every 2 minutes — that's 720 files per day. Processing all 720 gives you the most accurate storm-total composite. The <code>--step 5</code> flag (which is the default for backfills) only uses every 5th file (144 files), making it 5× faster but potentially missing peak hail intensity in the skipped minutes.</p>
+    <p><strong>For production quality runs, use <code>--step 1</code>.</strong> It takes longer but captures every storm cell correctly.</p>
+
+    <pre>
+<span class="comment"># Single day, full resolution, push to Base44:</span>
+python run.py --date 2026-07-27 --step 1
+
+<span class="comment"># Backfill last 30 days, full resolution, force re-push:</span>
+python run.py --days-back 30 --step 1 --force
+
+<span class="comment"># Test without pushing:</span>
+python run.py --date 2026-07-27 --step 1 --skip-push</pre>
+
+    <p>Raw GRIB2 files are cached in <code>hail-pipeline/data/raw/</code> (gitignored — they're large). Processed GeoJSON goes to <code>hail-pipeline/data/output/</code>.</p>
+
+
+    <!-- BASE44 -->
+    <h2 id="base44">Base44 — The Backend You Don't Have to Write</h2>
+
+    <p>Normally a project like this would need a server (Node, Python, whatever) and a database (Postgres, MongoDB). Base44 replaces both. You define your data model in their dashboard, and they give you:</p>
+
+    <ul class="bullets">
+      <li>A REST API to create, read, update, delete records</li>
+      <li>Authentication (the <code>appId</code> key identifies your app)</li>
+      <li>Storage that persists across sessions</li>
+    </ul>
+
+    <p>The SDK client (<code>base44.entities.HailSwath.list()</code>) is just a thin wrapper around those REST calls. Every entity you defined in Base44's dashboard becomes available as <code>base44.entities.YourEntity</code>.</p>
+
+    <div class="note">
+      <strong>Trade-off:</strong> Base44 is fast to build with but you're dependent on their platform. If you ever wanted to self-host, you'd need to export your data and wire up your own API.
+    </div>
+
+
+    <!-- PROXY -->
+    <h2 id="proxy">The Vite Proxy — Hiding API Keys</h2>
+
+    <p>API keys should never be in frontend JavaScript — anyone can open DevTools and read them. The Vite dev server has a proxy feature that lets the frontend make requests to <code>/xweather-api/...</code>, and Vite's server secretly replaces that with the real XWeather URL including the credentials. The browser never sees the actual key.</p>
+
+    <pre>
+<span class="comment"># What the frontend calls:</span>
+fetch('/xweather-api/stormreports/search?...')
+
+<span class="comment"># What Vite sends to XWeather (backend only):</span>
+https://api.aerisapi.com/stormreports/search?client_id=XXX&client_secret=YYY&...</pre>
+
+    <p>This is configured in <code>vite.config.ts</code>. The keys themselves come from <code>.env</code> (which is gitignored).</p>
+
+
+    <!-- COLOR SCALE -->
+    <h2 id="hailscale">Hail Size Color Scale</h2>
+
+    <p>Both data layers (MRMS polygons and XWeather dots) use the same color scale:</p>
+
+    <div class="hail-scale">
+      <div class="hail-chip"><div class="dot" style="background:#22d3ee"></div> &lt; 0.75"</div>
+      <div class="hail-chip"><div class="dot" style="background:#84cc16"></div> 0.75" (penny)</div>
+      <div class="hail-chip"><div class="dot" style="background:#eab308"></div> 1.0" (quarter)</div>
+      <div class="hail-chip"><div class="dot" style="background:#f59e0b"></div> 1.25" (half dollar)</div>
+      <div class="hail-chip"><div class="dot" style="background:#f97316"></div> 1.5" (ping pong)</div>
+      <div class="hail-chip"><div class="dot" style="background:#ea580c"></div> 1.75"</div>
+      <div class="hail-chip"><div class="dot" style="background:#dc2626"></div> 2.0"+ (golf ball)</div>
+    </div>
+
+    <p>Anything 1.0"+ (quarter size) is generally considered significant for property damage claims. 1.5"+ is where you see most roof damage.</p>
+
+
+    <!-- ENV VARS -->
+    <h2 id="env">Environment Variables</h2>
+
+    <p>All secrets live in <code>.env</code> files (gitignored). The frontend ones are prefixed with <code>VITE_</code> so Vite can inject them at build time.</p>
+
+    <pre>
+<span class="comment"># storm-frontend/.env</span>
+<span class="key">VITE_BASE44_APP_ID</span>=<span class="val">your-app-id</span>           <span class="comment"># Which Base44 app to talk to</span>
+<span class="key">VITE_XWEATHER_CLIENT_ID</span>=<span class="val">...</span>            <span class="comment"># XWeather MapsGL live overlays</span>
+<span class="key">VITE_XWEATHER_CLIENT_SECRET</span>=<span class="val">...</span>        <span class="comment"># XWeather MapsGL live overlays</span>
+<span class="key">VITE_SWATH_API_KEY</span>=<span class="val">...</span>                 <span class="comment"># Separate swath geometry API</span>
+<span class="key">VITE_XWEATHER_ID</span>=<span class="val">...</span>                   <span class="comment"># Used by Vite proxy for server-side calls</span>
+<span class="key">VITE_XWEATHER_SECRET</span>=<span class="val">...</span>
+
+<span class="comment"># hail-pipeline/.env</span>
+<span class="key">BASE44_APP_ID</span>=<span class="val">your-app-id</span>
+<span class="key">BASE44_API_KEY</span>=<span class="val">your-api-key</span>            <span class="comment"># Server-side key for pushing data</span></pre>
+
+    <div class="note">
+      <strong>Remember:</strong> The <code>VITE_</code> prefix means these values get baked into the built JavaScript and are visible to anyone who downloads your site. That's fine for the app ID (it's not secret), but the XWeather credentials are protected by the proxy so they never reach the frontend bundle.
+    </div>
+
+  </div>
+
+</body>
+</html>
