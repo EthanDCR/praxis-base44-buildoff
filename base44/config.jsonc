@@ -1,0 +1,6 @@
+{
+  // Base44 project configuration
+  "site": {
+    "outputDirectory": "./storm-frontend/dist"
+  }
+}

@@ -283,53 +283,90 @@
   background: var(--surface);
 }
 
-.filterWrap { padding: 10px 10px 0; flex-shrink: 0; }
+.filterWrap { padding: 10px 10px 0; flex-shrink: 0; position: relative; }
 
-.filterRow {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
-}
-
-.filterBtn {
+.filterTrigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
   background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 6px;
-  color: var(--text-muted);
   font-family: inherit;
-  font-size: 0.7rem;
-  font-weight: 500;
-  padding: 7px 4px;
-  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: color 0.12s, background 0.12s, border-color 0.12s;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  transition: background 0.12s, border-color 0.12s;
+  text-align: left;
 }
 
-.filterBtn:hover {
-  background: rgba(255,255,255,0.08);
+.filterTrigger:hover {
+  background: rgba(255,255,255,0.07);
   border-color: rgba(255,255,255,0.14);
+}
+
+.filterTriggerLabel { flex: 1; font-weight: 500; }
+
+.filterTriggerCount {
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-secondary);
 }
 
-.filterActive {
-  background: rgba(255,255,255,0.1);
-  border-color: rgba(255,255,255,0.22);
-  color: var(--text-primary);
-  font-weight: 600;
+.filterChevron { font-size: 0.65rem; color: var(--text-muted); transition: transform 0.15s; }
+.filterChevronOpen { transform: rotate(180deg); }
+
+.filterDrop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 10px;
+  right: 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--surface-border-strong);
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  z-index: 50;
+  overflow: hidden;
 }
 
-.filterCount {
-  display: inline-block;
-  background: rgba(255,255,255,0.07);
-  padding: 1px 5px;
-  border-radius: 8px;
-  font-size: 0.6rem;
+.filterOpt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--surface-border);
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, color 0.1s;
+}
+
+.filterOpt:last-child { border-bottom: none; }
+
+.filterOpt:hover {
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary);
+}
+
+.filterOptActive {
+  color: var(--text-primary);
+  font-weight: 600;
+  background: rgba(255,255,255,0.03);
+}
+
+.filterOptLabel { flex: 1; }
+
+.filterOptCount {
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-muted);
-  margin-left: 4px;
 }
 
 .queueList {
@@ -638,10 +675,39 @@
 .phoneRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   padding: 4px 0;
 }
+
+.phoneQuality {
+  display: flex;
+  gap: 5px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.pqBtn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+/* unselected — visible color hint */
+.pqBtn:nth-child(1) { background: rgba(34,197,94,0.08);  border: 1px solid rgba(34,197,94,0.25);  color: rgba(74,222,128,0.55); }
+.pqBtn:nth-child(2) { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); color: rgba(251,191,36,0.55); }
+.pqBtn:nth-child(3) { background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.25);  color: rgba(248,113,113,0.55); }
+
+/* selected — filled in solid */
+.pq_good   { background: rgba(34,197,94,0.85);  border-color: #4ade80;  color: #000 !important; }
+.pq_bad    { background: rgba(239,68,68,0.85);  border-color: #f87171;  color: #000 !important; }
+.pq_unsure { background: rgba(245,158,11,0.85); border-color: #fbbf24;  color: #000 !important; }
 
 .phone {
   font-size: 0.9375rem;

@@ -27,3 +27,26 @@
 
 
 
+
+
+Voicemail drops auto when you click voicemail(later)
+
+BUGS 
+
+move button selectors closer to the number they are by
+
+hard to tell which one is selected draw a border or something
+
+change it to like thumbs up and thumbs down icons 
+
+if you select certain things on the log popup like "unsure" it will  bring you to a differnt card or contact, which is weird, it should only ever bring you to the next number on that card until there are none left and its the last number on that card that has been called.
+
+sometimes it just jumps around cards, doesnt always go to the next number down in the card, also doesnt highlight or glow or anhting (the number currently being called)
+
+
+
+
+
+
+
+

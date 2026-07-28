@@ -30,7 +30,7 @@ interface Target {
   year_built?: string
   contacts?: Contact[]
   status: 'new' | 'called' | 'callback' | 'not_interested' | 'sold'
-  number_quality?: NumberQuality
+  phone_qualities?: Record<string, NumberQuality>
   notes?: string
 }
 
@@ -126,7 +126,8 @@ export default function SpeedDial() {
   const [filter, setFilter]             = useState<Filter>('all')
   const [loadingTargets, setLoadingTargets] = useState(false)
   const [saving, setSaving]             = useState(false)
-  const [showListDrop, setShowListDrop] = useState(false)
+  const [showListDrop, setShowListDrop]     = useState(false)
+  const [showFilterDrop, setShowFilterDrop] = useState(false)
 
   // Outcome modal
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
@@ -163,6 +164,7 @@ export default function SpeedDial() {
   const [transcript, setTranscript] = useState<Utterance[]>([])
 
   const listDropRef      = useRef<HTMLDivElement>(null)
+  const filterDropRef    = useRef<HTMLDivElement>(null)
   const activeItemRef    = useRef<HTMLButtonElement | null>(null)
   const activePhoneRef   = useRef<HTMLDivElement | null>(null)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
@@ -243,6 +245,8 @@ export default function SpeedDial() {
     function handler(e: MouseEvent) {
       if (listDropRef.current && !listDropRef.current.contains(e.target as Node))
         setShowListDrop(false)
+      if (filterDropRef.current && !filterDropRef.current.contains(e.target as Node))
+        setShowFilterDrop(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -395,13 +399,18 @@ export default function SpeedDial() {
     }
   }
 
-  async function setNumberQuality(quality: NumberQuality | null) {
+  async function setPhoneQuality(contactIdx: number, phoneIdx: number, quality: NumberQuality | null) {
     if (!activeId) return
     const id = activeId
+    const key = `${contactIdx}_${phoneIdx}`
+    const current = activeTarget?.phone_qualities ?? {}
+    const updated: Record<string, NumberQuality> = { ...current }
+    if (quality === null) delete updated[key]
+    else updated[key] = quality
     try {
-      await base44.entities.Target.update(id, { number_quality: quality ?? '' })
-      setTargets(prev => prev.map(t => t.id === id ? { ...t, number_quality: quality ?? undefined } : t))
-      setAllTargets(prev => prev.map(t => t.id === id ? { ...t, number_quality: quality ?? undefined } : t))
+      await base44.entities.Target.update(id, { phone_qualities: updated })
+      setTargets(prev => prev.map(t => t.id === id ? { ...t, phone_qualities: updated } : t))
+      setAllTargets(prev => prev.map(t => t.id === id ? { ...t, phone_qualities: updated } : t))
     } catch (e) { console.error(e) }
   }
 
@@ -697,21 +706,42 @@ export default function SpeedDial() {
           animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
           transition={{ delay: 0.1, duration: 0.6, ease: EASE }}
         >
-          <div className={styles.filterWrap}>
-            <div className={styles.filterRow}>
-              {FILTERS.map(({ key, label, countKey }) => (
-                <button
-                  key={key}
-                  className={`${styles.filterBtn} ${filter === key ? styles.filterActive : ''}`}
-                  onClick={() => setFilter(key)}
+          <div className={styles.filterWrap} ref={filterDropRef}>
+            <button
+              className={styles.filterTrigger}
+              onClick={() => setShowFilterDrop(d => !d)}
+            >
+              <span className={styles.filterTriggerLabel}>
+                {FILTERS.find(f => f.key === filter)?.label ?? 'All'}
+              </span>
+              {(() => { const f = FILTERS.find(f => f.key === filter); return f?.countKey && stats[f.countKey] > 0 ? <span className={styles.filterTriggerCount}>{stats[f.countKey]}</span> : null })()}
+              <span className={`${styles.filterChevron} ${showFilterDrop ? styles.filterChevronOpen : ''}`}>▾</span>
+            </button>
+            <AnimatePresence>
+              {showFilterDrop && (
+                <motion.div
+                  className={styles.filterDrop}
+                  initial={{ opacity: 0, y: -6, scaleY: 0.92 }}
+                  animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                  exit={{ opacity: 0, y: -4, scaleY: 0.94 }}
+                  transition={{ duration: 0.15, ease: EASE }}
+                  style={{ transformOrigin: 'top' }}
                 >
-                  {label}
-                  {countKey && stats[countKey] > 0 && (
-                    <span className={styles.filterCount}>{stats[countKey]}</span>
-                  )}
-                </button>
-              ))}
-            </div>
+                  {FILTERS.map(({ key, label, countKey }) => (
+                    <button
+                      key={key}
+                      className={`${styles.filterOpt} ${filter === key ? styles.filterOptActive : ''}`}
+                      onClick={() => { setFilter(key); setShowFilterDrop(false) }}
+                    >
+                      <span className={styles.filterOptLabel}>{label}</span>
+                      {countKey && stats[countKey] > 0 && (
+                        <span className={styles.filterOptCount}>{stats[countKey]}</span>
+                      )}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           <div className={styles.queueList}>
             {loadingTargets && <div className={styles.queueEmpty}>Loading…</div>}
@@ -845,6 +875,22 @@ export default function SpeedDial() {
                                     className={`${styles.phoneRow} ${isActive ? styles.phoneRowActive : ''}`}
                                   >
                                     <span className={`${styles.phone} ${isActive ? styles.phoneActive : ''}`}>{p}</span>
+                                    <div className={styles.phoneQuality}>
+                                      {(['good', 'unsure', 'bad'] as NumberQuality[]).map(q => {
+                                        const key = `${i}_${j}`
+                                        const active = activeTarget.phone_qualities?.[key] === q
+                                        return (
+                                          <button
+                                            key={q}
+                                            className={`${styles.pqBtn} ${active ? styles[`pq_${q}`] : ''}`}
+                                            onClick={() => setPhoneQuality(i, j, active ? null : q)}
+                                            title={q}
+                                          >
+                                            {q === 'good' ? '✓' : q === 'bad' ? '✕' : '?'}
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
                                     <button
                                       className={`${styles.dialLoadBtn} ${isActive ? styles.dialLoadBtnActive : ''}`}
                                       onClick={() => loadDialer(p, c.name)}
@@ -884,17 +930,6 @@ export default function SpeedDial() {
                         >
                           {noteSaving ? 'Saving…' : 'Save'}
                         </button>
-                      </div>
-                      <div className={styles.numberQuality}>
-                        {(['good', 'unsure', 'bad'] as NumberQuality[]).map(q => (
-                          <button
-                            key={q}
-                            className={`${styles.nqBtn} ${styles[`nq_${q}`]} ${activeTarget.number_quality === q ? styles.nqActive : ''}`}
-                            onClick={() => setNumberQuality(activeTarget.number_quality === q ? null : q)}
-                          >
-                            {q === 'good' ? '✓ Good #' : q === 'bad' ? '✕ Bad #' : '? Unsure'}
-                          </button>
-                        ))}
                       </div>
                       <textarea
                         className={styles.notesTextarea}
