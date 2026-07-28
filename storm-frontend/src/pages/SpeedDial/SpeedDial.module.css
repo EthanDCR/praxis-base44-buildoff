@@ -213,9 +213,10 @@
   margin-left: 4px;
 }
 
-.stat    { font-size: 0.6875rem; color: var(--text-muted); letter-spacing: 0.02em; }
-.statNum { font-size: 0.9375rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-primary); letter-spacing: -0.02em; margin-right: 2px; }
-.statDiv { width: 1px; height: 12px; background: var(--surface-border); }
+.stat     { font-size: 0.6875rem; color: var(--text-muted); letter-spacing: 0.02em; }
+.statNum  { font-size: 0.9375rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-primary); letter-spacing: -0.02em; margin-right: 2px; }
+.statDiv  { width: 1px; height: 12px; background: var(--surface-border); }
+.statDate { font-size: 0.6875rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0.03em; }
 
 /* In-call */
 .inCallBadge {

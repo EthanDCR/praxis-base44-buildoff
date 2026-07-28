@@ -82,7 +82,10 @@ interface HailEvent {
 
 interface DailyStats { date: string; calls: number; dms: number; leads: number }
 
-function todayStr() { return new Date().toISOString().slice(0, 10) }
+function todayStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 function loadDailyStats(): DailyStats {
   try {
@@ -656,10 +659,12 @@ export default function SpeedDial() {
               )}
             </AnimatePresence>
           </div>
-
         </div>
 
-        <div className={styles.dailyTracker}>
+       
+	<div className={styles.dailyTracker}>
+          <span className={styles.statDate}>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          <span className={styles.statDiv} />
           <span className={styles.stat}><span className={styles.statNum}>{dailyStats.calls}</span> calls</span>
           <span className={styles.statDiv} />
           <span className={styles.stat}><span className={styles.statNum}>{dailyStats.dms}</span> dm</span>
