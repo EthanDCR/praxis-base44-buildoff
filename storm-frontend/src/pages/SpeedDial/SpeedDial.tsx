@@ -151,6 +151,11 @@ export default function SpeedDial() {
   const [callSeconds, setCallSeconds]     = useState(0)
   const [autoDialing, setAutoDialing]     = useState(false)
 
+  // Incoming callback call
+  const [incomingCall, setIncomingCall]     = useState<Call | null>(null)
+  const [incomingFrom, setIncomingFrom]     = useState<string>('')
+  const [incomingTarget, setIncomingTarget] = useState<Target | null>(null)
+
   // Transcript (wired to Twilio when connected)
   const [transcript, setTranscript] = useState<Utterance[]>([])
 
@@ -184,6 +189,13 @@ export default function SpeedDial() {
         device.on('registered',   () => setTwilioReady(true))
         device.on('unregistered', () => setTwilioReady(false))
         device.on('error',        (err) => { console.error('Twilio:', err); setTwilioReady(false) })
+
+        device.on('incoming', (call: Call) => {
+          const from = call.parameters.From ?? ''
+          setIncomingCall(call)
+          setIncomingFrom(from)
+          call.on('cancel', () => setIncomingCall(null))
+        })
 
         await device.register()
       } catch (err) {
@@ -390,6 +402,37 @@ export default function SpeedDial() {
     } catch (e) { console.error(e) }
   }
 
+  // Look up which target is calling back whenever an inbound call arrives
+  useEffect(() => {
+    if (!incomingCall) { setIncomingTarget(null); return }
+    const norm = incomingFrom.replace(/\D/g, '').replace(/^1/, '')
+    const found = allTargets.find(t =>
+      t.contacts?.some(c =>
+        c.phones.some(p => p.replace(/\D/g, '').replace(/^1/, '') === norm)
+      )
+    ) ?? null
+    setIncomingTarget(found)
+  }, [incomingCall, incomingFrom, allTargets])
+
+  function acceptIncoming() {
+    if (!incomingCall) return
+    if (callState === 'active') hangUp()
+    incomingCall.accept()
+    activeCallRef.current = incomingCall
+    setCallState('active')
+    setDialerPhone(incomingFrom)
+    setDialerContact(incomingTarget?.contacts?.[0]?.name ?? 'Callback')
+    if (incomingTarget) setActiveId(incomingTarget.id)
+    incomingCall.on('disconnect', onCallDisconnected)
+    incomingCall.on('error', () => onCallDisconnected())
+    setIncomingCall(null)
+  }
+
+  function declineIncoming() {
+    incomingCall?.reject()
+    setIncomingCall(null)
+  }
+
   function stopAutoDialing() {
     setAutoDialing(false)
     if (callState === 'active') {
@@ -465,6 +508,49 @@ export default function SpeedDial() {
 
   return (
     <div className={styles.page}>
+
+      {/* ── Incoming call overlay ───────────────────────────────────── */}
+      <AnimatePresence>
+        {incomingCall && (
+          <motion.div
+            className={styles.incomingOverlay}
+            initial={{ opacity: 0, y: -20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.97 }}
+            transition={{ duration: 0.22, ease: EASE }}
+          >
+            <div className={styles.incomingPulse} />
+            <div className={styles.incomingHeader}>
+              <span className={styles.incomingIcon}>📞</span>
+              <span className={styles.incomingTitle}>Incoming Callback</span>
+              <span className={styles.incomingNum}>{incomingFrom}</span>
+            </div>
+
+            {incomingTarget ? (
+              <div className={styles.incomingInfo}>
+                <div className={styles.incomingName}>{incomingTarget.contacts?.[0]?.name ?? '—'}</div>
+                <div className={styles.incomingAddr}>{incomingTarget.line1}</div>
+                <div className={styles.incomingAddr2}>{incomingTarget.line2}</div>
+                <div className={styles.incomingMeta}>
+                  {incomingTarget.hail_size && <span>{incomingTarget.hail_size}" hail</span>}
+                  {incomingTarget.hail_date && <span>{new Date(incomingTarget.hail_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                  <span className={styles.incomingStatus}>{STATUS_LABEL[incomingTarget.status]}</span>
+                </div>
+                {incomingTarget.notes && (
+                  <div className={styles.incomingNote}>"{incomingTarget.notes}"</div>
+                )}
+              </div>
+            ) : (
+              <div className={styles.incomingUnknown}>Unknown caller — not in your lists</div>
+            )}
+
+            <div className={styles.incomingActions}>
+              <button className={styles.incomingDecline} onClick={declineIncoming}>Decline</button>
+              <button className={styles.incomingAccept} onClick={acceptIncoming}>Answer</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Outcome modal — blocks until logged ─────────────────────── */}
       <AnimatePresence>

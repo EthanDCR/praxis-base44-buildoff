@@ -1110,3 +1110,144 @@
 
 .utteranceAgent .utteranceLabel { color: var(--blue-400); opacity: 0.7; }
 .utteranceAgent .utteranceText  { color: var(--text-primary); }
+
+/* ── Incoming call overlay ───────────────────────────────────────────────── */
+.incomingOverlay {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  background: var(--surface-raised);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(34,197,94,0.08);
+  z-index: 200;
+  overflow: hidden;
+}
+
+@keyframes incomingPulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.15; }
+}
+
+.incomingPulse {
+  position: absolute;
+  inset: 0;
+  background: rgba(34, 197, 94, 0.06);
+  animation: incomingPulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.incomingHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.incomingIcon { font-size: 1rem; }
+
+.incomingTitle {
+  flex: 1;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #4ade80;
+}
+
+.incomingNum {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.incomingInfo {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.incomingName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.incomingAddr {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.incomingAddr2 {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.incomingMeta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.incomingMeta span { display: flex; align-items: center; gap: 4px; }
+.incomingMeta span + span::before { content: '·'; opacity: 0.4; }
+
+.incomingStatus {
+  color: #fbbf24;
+}
+
+.incomingNote {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.incomingUnknown {
+  padding: 12px 14px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.incomingActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--surface-border);
+}
+
+.incomingDecline {
+  padding: 10px;
+  background: none;
+  border: none;
+  border-right: 1px solid var(--surface-border);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.incomingDecline:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+}
+
+.incomingAccept {
+  padding: 10px;
+  background: rgba(34, 197, 94, 0.08);
+  border: none;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #4ade80;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.incomingAccept:hover {
+  background: rgba(34, 197, 94, 0.16);
+}
