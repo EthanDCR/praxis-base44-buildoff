@@ -7,7 +7,10 @@ import Navbar from './components/Navbar/Navbar'
 import HailMap from './pages/HailMap/HailMap'
 import SpeedDial from './pages/SpeedDial/SpeedDial'
 import Leads from './pages/Leads/Leads'
+import Overwatch from './pages/Overwatch/Overwatch'
 import Login from './pages/Login/Login'
+import { base44 } from './lib/base44'
+import { UserProvider, type AppUser } from './lib/user-context'
 
 type Phase = 'splash' | 'login' | 'app'
 
@@ -38,50 +41,60 @@ function Splash({ onDone }: { onDone: () => void }) {
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>('splash')
+  const [user, setUser] = useState<AppUser | null>(null)
 
-  function onSplashDone() {
+  async function onSplashDone() {
     if (import.meta.env.DEV) { setPhase('app'); return }
-    const authed = sessionStorage.getItem('praxis_auth') === '1'
-    setPhase(authed ? 'app' : 'login')
+    try {
+      const me = await base44.auth.me()
+      setUser(me as AppUser)
+      setPhase('app')
+    } catch {
+      setPhase('login')
+    }
   }
 
-  function onAuth() {
+  function onAuth(authedUser: AppUser) {
+    setUser(authedUser)
     setPhase('app')
   }
 
   return (
-    <AnimatePresence mode="wait">
-      {phase === 'splash' && (
-        <Splash key="splash" onDone={onSplashDone} />
-      )}
-      {phase === 'login' && (
-        <motion.div
-          key="login"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4 }}
-        >
-          <Login onAuth={onAuth} />
-        </motion.div>
-      )}
-      {phase === 'app' && (
-        <motion.div
-          key="app"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.35 }}
-          style={{ height: '100%' }}
-        >
-          <BrowserRouter>
-            <Navbar />
-            <Routes>
-              <Route path="/" element={<HailMap />} />
-              <Route path="/speed-dial" element={<SpeedDial />} />
-              <Route path="/leads" element={<Leads />} />
-            </Routes>
-          </BrowserRouter>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <UserProvider value={user}>
+      <AnimatePresence mode="wait">
+        {phase === 'splash' && (
+          <Splash key="splash" onDone={onSplashDone} />
+        )}
+        {phase === 'login' && (
+          <motion.div
+            key="login"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <Login onAuth={onAuth} />
+          </motion.div>
+        )}
+        {phase === 'app' && (
+          <motion.div
+            key="app"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35 }}
+            style={{ height: '100%' }}
+          >
+            <BrowserRouter>
+              <Navbar />
+              <Routes>
+                <Route path="/" element={<HailMap />} />
+                <Route path="/speed-dial" element={<SpeedDial />} />
+                <Route path="/leads" element={<Leads />} />
+                <Route path="/overwatch" element={<Overwatch />} />
+              </Routes>
+            </BrowserRouter>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </UserProvider>
   )
 }

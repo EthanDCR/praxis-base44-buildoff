@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { Device, Call } from '@twilio/voice-sdk'
 import { base44 } from '../../lib/base44'
@@ -115,6 +116,9 @@ function googleMapsEmbedUrl(target: Target): string {
 }
 
 export default function SpeedDial() {
+  const location = useLocation()
+  const navState = (location.state ?? {}) as { targetId?: string; listId?: string }
+
   const [lists, setLists]               = useState<CallList[]>([])
   const [activeListId, setActiveListId] = useState<string | null>(null)
   const [targets, setTargets]           = useState<Target[]>([])
@@ -172,7 +176,7 @@ export default function SpeedDial() {
     base44.entities.CallList.list()
       .then((d: any) => {
         setLists(d)
-        if (d.length > 0) setActiveListId(d[0].id)
+        if (navState.listId) setActiveListId(navState.listId)
       })
       .catch(console.error)
   }, [])
@@ -224,8 +228,12 @@ export default function SpeedDial() {
       .then((d: any) => {
         const working = d.filter((t: Target) => t.status !== 'sold')
         setTargets(working)
-        const first = working.find((t: Target) => t.status === 'new' || t.status === 'callback')
-        if (first) setActiveId(first.id)
+        if (navState.targetId && working.find((t: Target) => t.id === navState.targetId)) {
+          setActiveId(navState.targetId)
+        } else {
+          const first = working.find((t: Target) => t.status === 'new' || t.status === 'callback')
+          if (first) setActiveId(first.id)
+        }
       })
       .catch(console.error)
       .finally(() => setLoadingTargets(false))

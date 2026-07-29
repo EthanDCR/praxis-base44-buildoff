@@ -95,6 +95,45 @@
   font-weight: 600;
 }
 
+/* ── User section ───────────────────────────── */
+.userSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 24px;
+}
+
+.userEmail {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.logoutBtn {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  opacity: 0.45;
+  padding: 4px 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.logoutBtn:hover {
+  opacity: 0.8;
+  color: var(--text-secondary);
+}
+
 /* thin red line under the active item */
 .active::after {
   content: '';

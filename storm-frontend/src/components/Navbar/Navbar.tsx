@@ -3,6 +3,8 @@ import { motion } from 'motion/react'
 import { useLottie } from 'lottie-react'
 import animationData from '../../assets/praxis-animation-lottie.json'
 import styles from './Navbar.module.css'
+import { useUser } from '../../lib/user-context'
+import { base44 } from '../../lib/base44'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -13,6 +15,7 @@ function LogoAnimation() {
 
 export default function Navbar() {
   const location = useLocation()
+  const user = useUser()
   return (
     <nav className={styles.nav}>
       <div className={styles.brand}>
@@ -44,6 +47,7 @@ export default function Navbar() {
           { to: '/',           label: 'Storm Map' },
           { to: '/speed-dial', label: 'Targets'   },
           { to: '/leads',      label: 'Leads'     },
+          { to: '/overwatch',  label: 'Overwatch' },
         ].map(({ to, label }) => (
           <li key={to}>
             <NavLink
@@ -58,6 +62,15 @@ export default function Navbar() {
           </li>
         ))}
       </ul>
+
+      {user && (
+        <div className={styles.userSection}>
+          <span className={styles.userEmail}>{user.full_name ?? user.email}</span>
+          <button className={styles.logoutBtn} onClick={() => base44.auth.logout()}>
+            Sign out
+          </button>
+        </div>
+      )}
     </nav>
   )
 }

@@ -1,10 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import styles from './Login.module.css'
+import { base44 } from '../../lib/base44'
+import type { AppUser } from '../../lib/user-context'
 
-const VALID_EMAIL = import.meta.env.VITE_AUTH_USERNAME as string
-const VALID_PASS  = import.meta.env.VITE_AUTH_PASSWORD as string
-
-interface Props { onAuth: () => void }
+interface Props { onAuth: (user: AppUser) => void }
 
 export default function Login({ onAuth }: Props) {
   const [email, setEmail]       = useState('')
@@ -13,16 +12,18 @@ export default function Login({ onAuth }: Props) {
   const [loading, setLoading]   = useState(false)
   const [shaking, setShaking]   = useState(false)
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
-
-    if (email === VALID_EMAIL && password === VALID_PASS) {
-      sessionStorage.setItem('praxis_auth', '1')
-      onAuth()
-    } else {
-      setError('Invalid email or password')
+    try {
+      const { user } = await base44.auth.loginViaEmailPassword(email, password)
+      onAuth(user as AppUser)
+    } catch (err: any) {
+      const msg = err?.status === 403
+        ? 'Account not verified — contact your admin.'
+        : 'Invalid email or password.'
+      setError(msg)
       setShaking(true)
       setTimeout(() => setShaking(false), 500)
       setLoading(false)
