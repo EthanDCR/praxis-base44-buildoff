@@ -1,0 +1,14 @@
+
+Praxis was built to solve a real problem in the storm restoration industry: after a major hail event, contractors waste hours manually cross-referencing radar data, looking up addresses, and cold-calling from spreadsheets. We wanted to build the tool we actually want to use in the field.
+
+What we built
+
+Praxis combines three things that have never existed in one place: a live hail map pulling from NOAA MRMS radar data and XWeather confirmed storm reports, a one-click speed dialer powered by Twilio that auto-advances through call lists, and  tracks every contact from first call to signed deal. We also route all callbacks to our outbound numbers directly back to the app, notifying the user of a callback, along with the contact data that is associated with that number which is re queried from the base 44 database when a callback comes in.
+                                                                                                         
+ How we built it
+
+The backend runs entirely on Base44. Entities for targets, call lists, leads, and hail swaths, with a custom Deno function proxying the IHM API to handle CORS. We built a Python pipeline that ingests raw NOAA MRMS GRIB2 radar files, processes them into GeoJSON swath polygons sized by hail intensity, and stores them as Base44 entities. The frontend is React + TypeScript with maplibre-gl for the WebGL map.
+
+What we learned
+
+ The thing I ultimately was blocked on the longest ended up being the deployment. Maplibre-gl v6 (The map I went with for the interface)uses ES module workers that Vite doesn't automatically copy into the production build. The worker files were missing from dist, so the server would return the wrong MIME type and the map's GeoJSON rendering would silently fail while raster tiles still worked fine, making it nearly impossible to diagnose. We spent hours debugging before realizing the fix was a single line in the build script. Because Base44's hosting routes all unmatched requests back to the app's index page, those missing worker files would always return HTML instead of JavaScript, a fundamental incompatibility with how maplibre-gl loads its workers. With time running out, we made the call to serve the frontend on Vercel while keeping the entire back end, database, and functions on Base44. The front end is also live on base44 but the swaths currently do not render on our map. There are still bugs we didn't get to fix, but we're proud of what we were able to build in just a few days, a genuinely useful tool that we will use in the real world day to day.
