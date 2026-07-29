@@ -110,10 +110,6 @@ function formatDuration(s: number) {
 }
 
 function googleMapsEmbedUrl(target: Target): string {
-  if (target.lat && target.lng) {
-    const loc = `${target.lat},${target.lng}`
-    return `https://www.google.com/maps?q=${loc}&ll=${loc}&t=k&z=18&output=embed`
-  }
   const addr = encodeURIComponent([target.line1, target.line2].filter(Boolean).join(', '))
   return `https://www.google.com/maps?q=${addr}&t=k&z=18&output=embed`
 }
@@ -245,6 +241,7 @@ export default function SpeedDial() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
 
   useEffect(() => {
     activeItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -612,8 +609,8 @@ export default function SpeedDial() {
       {/* ── Top bar ─────────────────────────────────────────────────── */}
       <motion.div
         className={styles.topBar}
-        initial={{ opacity: 0, y: -10, filter: 'blur(6px)' }}
-        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: EASE }}
       >
         <div className={styles.topLeft}>
@@ -691,8 +688,8 @@ export default function SpeedDial() {
         {/* Queue */}
         <motion.div
           className={styles.queue}
-          initial={{ opacity: 0, x: -16, filter: 'blur(6px)' }}
-          animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+          initial={{ opacity: 0, x: -16 }}
+          animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1, duration: 0.6, ease: EASE }}
         >
           <div className={styles.filterWrap} ref={filterDropRef}>
@@ -763,8 +760,8 @@ export default function SpeedDial() {
         {/* Workspace */}
         <motion.div
           className={styles.workspace}
-          initial={{ opacity: 0, filter: 'blur(6px)' }}
-          animate={{ opacity: 1, filter: 'blur(0px)' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ delay: 0.15, duration: 0.6, ease: EASE }}
         >
 
@@ -796,8 +793,20 @@ export default function SpeedDial() {
                       {activeTarget.line2 && <div className={styles.addressSub}>{activeTarget.line2}</div>}
                       <div className={styles.hailLine}>
                         {hailLoading && <span className={styles.hailLineText}>Loading hail data…</span>}
-                        {!hailLoading && hailData && hailData.length === 0 && (
+                        {!hailLoading && hailData && hailData.length === 0 && !activeTarget.hail_size && (
                           <span className={styles.hailLineText}>No hail events on record</span>
+                        )}
+                        {!hailLoading && hailData && hailData.length === 0 && activeTarget.hail_size && (
+                          <>
+                            <span className={styles.hailLineLabel}>Last hit</span>
+                            <span className={styles.hailLineDate}>
+                              {activeTarget.hail_date
+                                ? new Date(activeTarget.hail_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                : '—'}
+                            </span>
+                            <span className={styles.hailLineDot} />
+                            <span className={styles.hailLineSize}>{activeTarget.hail_size}"</span>
+                          </>
                         )}
                         {!hailLoading && hailData && hailData.length > 0 && (
                           <>
@@ -1049,27 +1058,6 @@ export default function SpeedDial() {
               </div>
             </div>
 
-            {/* Transcript */}
-            <div className={styles.transcriptSection}>
-              <div className={styles.panelLabel}>Live Transcript</div>
-              <div className={styles.transcriptBody}>
-                {transcript.length === 0 ? (
-                  <span className={styles.transcriptEmpty}>
-                    {callState === 'active'
-                      ? 'Waiting for speech…'
-                      : 'Transcript appears here during calls'}
-                  </span>
-                ) : (
-                  transcript.map((u, i) => (
-                    <div key={i} className={`${styles.utterance} ${u.speaker === 'agent' ? styles.utteranceAgent : ''}`}>
-                      <span className={styles.utteranceLabel}>{u.speaker === 'agent' ? 'You' : 'Contact'}</span>
-                      <span className={styles.utteranceText}>{u.text}</span>
-                    </div>
-                  ))
-                )}
-                <div ref={transcriptEndRef} />
-              </div>
-            </div>
 
           </div>
         </motion.div>
