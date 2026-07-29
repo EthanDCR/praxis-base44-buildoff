@@ -59,9 +59,18 @@
     },
     "status": {
       "type": "string",
-      "enum": ["new", "called", "callback", "not_interested", "sold"],
+      "enum": ["new", "called", "callback", "not_interested", "sold", "overwatch", "crm_sent"],
       "default": "new",
       "description": "Current status of this target"
+    },
+    "phone_qualities": {
+      "type": "object",
+      "description": "Per-phone quality ratings keyed by contactIdx_phoneIdx"
+    },
+    "damage_signal": {
+      "type": "string",
+      "enum": ["yes", "no"],
+      "description": "Damage detected by inspection API — yes or no"
     },
     "notes": {
       "type": "string",
