@@ -1,8 +1,8 @@
-import { useState, FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import styles from './Login.module.css'
 
-const VALID_USER = import.meta.env.VITE_AUTH_USERNAME as string
-const VALID_PASS = import.meta.env.VITE_AUTH_PASSWORD as string
+const VALID_EMAIL = import.meta.env.VITE_AUTH_USERNAME as string
+const VALID_PASS  = import.meta.env.VITE_AUTH_PASSWORD as string
 
 interface Props { onAuth: () => void }
 
@@ -16,8 +16,10 @@ export default function Login({ onAuth }: Props) {
   function submit(e: FormEvent) {
     e.preventDefault()
     setLoading(true)
-    if (email === VALID_USER && password === VALID_PASS) {
-      localStorage.setItem('praxis_auth', '1')
+    setError('')
+
+    if (email === VALID_EMAIL && password === VALID_PASS) {
+      sessionStorage.setItem('praxis_auth', '1')
       onAuth()
     } else {
       setError('Invalid email or password')

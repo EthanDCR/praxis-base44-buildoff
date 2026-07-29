@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import '@xweather/mapsgl/dist/mapsgl.css'
 import { base44 } from '../../lib/base44'
 import { motion, AnimatePresence } from 'motion/react'
 import { fetchHailReports } from '../../lib/xweather'
@@ -10,8 +9,6 @@ import styles from './HailMap.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 const NOMINATIM = 'https://nominatim.openstreetmap.org'
-const XWEATHER_CLIENT_ID     = import.meta.env.VITE_XWEATHER_CLIENT_ID     as string
-const XWEATHER_CLIENT_SECRET = import.meta.env.VITE_XWEATHER_CLIENT_SECRET as string
 
 const DARK_TILES = [
   'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
@@ -43,17 +40,6 @@ function hailColor(size: number): string {
   return '#22d3ee'
 }
 
-const HAIL_COLOR_EXPR = [
-  'step', ['get', 'min_size_inches'],
-  '#22d3ee', 0.75, '#84cc16', 1.0, '#eab308',
-  1.25, '#f59e0b', 1.5, '#f97316', 1.75, '#ea580c', 2.0, '#dc2626',
-]
-
-const HAIL_COLOR_EXPR_XW = [
-  'step', ['get', 'hailIN'],
-  '#22d3ee', 0.75, '#84cc16', 1.0, '#eab308',
-  1.25, '#f59e0b', 1.5, '#f97316', 1.75, '#ea580c', 2.0, '#dc2626',
-]
 
 interface SelectedAddress { display: string; line1: string; line2: string; lat: number; lng: number }
 interface HoverInfo { x: number; y: number; props: Record<string, any>; kind: 'mrms' | 'xw' }
@@ -95,15 +81,21 @@ export default function HailMap() {
   // ── MRMS data ────────────────────────────────────────────
   const [mrmsFeatures, setMrmsFeatures] = useState<any[]>([])
   useEffect(() => {
-    base44.entities.HailSwath.list()
-      .then((data: any) => setMrmsFeatures(Array.isArray(data) ? data : (data?.data ?? [])))
-      .catch(console.error)
+    base44.entities.HailSwath.filter({}, undefined, 500)
+      .then((data: any) => {
+        const arr = Array.isArray(data) ? data : (data?.data ?? [])
+        console.log('[HailSwath] loaded', arr.length, 'records', arr[0])
+        setMrmsFeatures(arr)
+      })
+      .catch(e => console.error('[HailSwath] fetch error', e))
   }, [])
 
   // ── XWeather reports ─────────────────────────────────────
   const [xwReports, setXwReports] = useState<XWHailReport[]>([])
   useEffect(() => {
-    fetchHailReports(rangeDays, minSize).then(setXwReports).catch(console.error)
+    fetchHailReports(rangeDays, minSize)
+      .then(r => { console.log('[XWeather] loaded', r.length, 'reports'); setXwReports(r) })
+      .catch(e => console.error('[XWeather] fetch error', e))
   }, [rangeDays, minSize])
 
   // ── Property / list state ────────────────────────────────
@@ -124,20 +116,21 @@ export default function HailMap() {
   // ── GeoJSON memos ────────────────────────────────────────
   const mrmsGeoJSON = useMemo(() => {
     const cutoff = new Date(Date.now() - rangeDays * 86400000)
-    return {
-      type: 'FeatureCollection' as const,
-      features: mrmsFeatures.flatMap(f => {
-        if ((f.min_size_inches ?? 0) < minSize) return []
-        if (f.event_date && new Date(f.event_date) < cutoff) return []
-        try {
-          return [{
-            type: 'Feature' as const,
-            geometry: JSON.parse(f.geometry),
-            properties: { min_size_inches: f.min_size_inches ?? 0, event_date: f.event_date ?? '' },
-          }]
-        } catch { return [] }
-      }),
-    }
+    let skippedSize = 0, skippedDate = 0, skippedParse = 0
+    const features = mrmsFeatures.flatMap(f => {
+      if ((f.min_size_inches ?? 0) < minSize) { skippedSize++; return [] }
+      if (f.event_date && new Date(f.event_date) < cutoff) { skippedDate++; return [] }
+      try {
+        const geom = typeof f.geometry === 'string' ? JSON.parse(f.geometry) : f.geometry
+        return [{
+          type: 'Feature' as const,
+          geometry: geom,
+          properties: { min_size_inches: f.min_size_inches ?? 0, event_date: f.event_date ?? '' },
+        }]
+      } catch { skippedParse++; return [] }
+    })
+    console.log(`[mrmsGeoJSON] ${features.length} features (skipped: size=${skippedSize} date=${skippedDate} parse=${skippedParse})`)
+    return { type: 'FeatureCollection' as const, features }
   }, [mrmsFeatures, minSize, rangeDays])
 
   const xwReportsGeoJSON = useMemo(() => ({
@@ -184,13 +177,22 @@ export default function HailMap() {
 
       // MRMS polygons
       map.addSource('mrms', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      const hailColorExpr: any = ['step', ['get', 'min_size_inches'],
+        '#22d3ee', 0.75,
+        '#84cc16', 1.0,
+        '#eab308', 1.25,
+        '#f59e0b', 1.5,
+        '#f97316', 1.75,
+        '#ea580c', 2.0,
+        '#dc2626',
+      ]
       map.addLayer({
         id: 'mrms-fill', type: 'fill', source: 'mrms',
-        paint: { 'fill-color': HAIL_COLOR_EXPR as any, 'fill-opacity': 0.28 },
+        paint: { 'fill-color': hailColorExpr, 'fill-opacity': 0.4 },
       })
       map.addLayer({
         id: 'mrms-outline', type: 'line', source: 'mrms',
-        paint: { 'line-color': HAIL_COLOR_EXPR as any, 'line-width': 1.5, 'line-opacity': 0.85 },
+        paint: { 'line-color': hailColorExpr, 'line-width': 1.5, 'line-opacity': 0.85 },
       })
 
       // XWeather confirmed hail reports
@@ -198,7 +200,10 @@ export default function HailMap() {
       map.addLayer({
         id: 'xw-reports-circle', type: 'circle', source: 'xw-reports',
         paint: {
-          'circle-color': HAIL_COLOR_EXPR_XW as any,
+          'circle-color': ['step', ['get', 'hailIN'],
+            '#22d3ee', 0.75, '#84cc16', 1.0, '#eab308', 1.25,
+            '#f59e0b', 1.5, '#f97316', 1.75, '#ea580c', 2.0, '#dc2626',
+          ] as any,
           'circle-radius': 5,
           'circle-opacity': 0.85,
           'circle-stroke-width': 1,
@@ -207,24 +212,10 @@ export default function HailMap() {
       })
 
       setMapLoaded(true)
-
-      // MapsGL weather layers
-      try {
-        const mapsgl = await import('@xweather/mapsgl')
-        const account    = new mapsgl.Account(XWEATHER_CLIENT_ID, XWEATHER_CLIENT_SECRET)
-        const controller = new mapsgl.MaplibreMapController(map as any, { account })
-        controller.on('load', () => {
-          controller.addWeatherLayer('radar')
-          controller.addWeatherLayer('hail-size')
-        })
-        controllerRef.current = controller
-      } catch (e) {
-        console.warn('MapsGL unavailable:', e)
-      }
     })
 
     // Hover tooltip
-    map.on('mousemove', (e) => {
+    map.on('mousemove', (e: any) => {
       const features = map.queryRenderedFeatures(e.point, { layers: ['mrms-fill', 'xw-reports-circle'] })
       if (features.length) {
         const f = features[0]
@@ -237,13 +228,13 @@ export default function HailMap() {
       }
     })
 
-    map.on('mouseleave', () => {
+    map.on('mouseleave' as any, () => {
       setHoverInfo(null)
       map.getCanvas().style.cursor = ''
     })
 
     // Click → reverse geocode
-    map.on('click', async (e) => {
+    map.on('click', async (e: any) => {
       const { lng, lat } = e.lngLat
       try {
         const res  = await fetch(
@@ -270,11 +261,13 @@ export default function HailMap() {
   // ── Sync GeoJSON sources when data changes ───────────────
   useEffect(() => {
     const src = mapRef.current?.getSource('mrms') as maplibregl.GeoJSONSource | undefined
+    console.log('[mrms setData] source found:', !!src, 'features:', mrmsGeoJSON.features.length, 'mapLoaded:', mapLoaded)
     src?.setData(mrmsGeoJSON as any)
   }, [mrmsGeoJSON, mapLoaded])
 
   useEffect(() => {
     const src = mapRef.current?.getSource('xw-reports') as maplibregl.GeoJSONSource | undefined
+    console.log('[xw setData] source found:', !!src, 'features:', xwReportsGeoJSON.features.length, 'mapLoaded:', mapLoaded)
     src?.setData(xwReportsGeoJSON as any)
   }, [xwReportsGeoJSON, mapLoaded])
 

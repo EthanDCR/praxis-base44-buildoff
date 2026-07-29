@@ -173,12 +173,17 @@ export default function SpeedDial() {
   const activeCallRef    = useRef<Call | null>(null)
 
   useEffect(() => {
-    base44.entities.CallList.list().then((d: any) => setLists(d)).catch(console.error)
+    base44.entities.CallList.list()
+      .then((d: any) => {
+        setLists(d)
+        if (d.length > 0) setActiveListId(d[0].id)
+      })
+      .catch(console.error)
   }, [])
 
   // Initialize Twilio Device
   useEffect(() => {
-    const tokenUrl = '/twilio-token'
+    const tokenUrl = import.meta.env.VITE_TWILIO_TOKEN_URL || '/twilio-token'
 
     let device: Device
 
@@ -212,34 +217,23 @@ export default function SpeedDial() {
     return () => { device?.destroy() }
   }, [])
 
-  const [allTargets, setAllTargets] = useState<Target[]>([])
-
-  // Load everything once on mount
+  // Load targets — filtered by list if one is selected
   useEffect(() => {
     setLoadingTargets(true)
-    base44.entities.Target.list()
+    setTargets([])
+    setActiveId(null)
+    setAutoDialing(false)
+    const query = activeListId ? { list_id: activeListId } : {}
+    base44.entities.Target.filter(query, undefined, 2000)
       .then((d: any) => {
-        // sold targets graduate to the Leads page — exclude them here
         const working = d.filter((t: Target) => t.status !== 'sold')
-        setAllTargets(working)
-        const pool = working.filter((t: Target) => t.status === 'new' || t.status === 'callback')
-        if (pool[0]) setActiveId(pool[0].id)
+        setTargets(working)
+        const first = working.find((t: Target) => t.status === 'new' || t.status === 'callback')
+        if (first) setActiveId(first.id)
       })
       .catch(console.error)
       .finally(() => setLoadingTargets(false))
-  }, [])
-
-  // List filter is client-side
-  useEffect(() => {
-    const pool = activeListId
-      ? allTargets.filter(t => t.list_id === activeListId)
-      : allTargets
-    setTargets(pool)
-    setActiveId(null)
-    setAutoDialing(false)
-    const first = pool.find(t => t.status === 'new' || t.status === 'callback')
-    if (first) setActiveId(first.id)
-  }, [activeListId, allTargets])
+  }, [activeListId])
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -282,10 +276,9 @@ export default function SpeedDial() {
     if (!activeTarget?.lat || !activeTarget?.lng) { setHailData(null); return }
     setHailLoading(true)
     setHailData(null)
-    fetch(`/ihm-api/ImpactDatesForLatLong?Lat=${activeTarget.lat}&Long=${activeTarget.lng}&Months=36`)
-      .then(r => { if (!r.ok) throw new Error(`IHM ${r.status}`); return r.json() })
-      .then((data: any) => {
-        console.log('IHM raw response:', data)
+    base44.functions.invoke('ihm-proxy', { lat: activeTarget.lat, lng: activeTarget.lng, months: 36 })
+      .then((res: any) => {
+        const data = res.data
         const events: HailEvent[] = Array.isArray(data) ? data : (data.ImpactDates ?? data.impactDates ?? data.results ?? [])
         setHailData(events)
       })
@@ -390,8 +383,7 @@ export default function SpeedDial() {
     setNoteSaving(true)
     try {
       await base44.entities.Target.update(activeId, { notes: notesDraft })
-      setTargets(prev => prev.map(t => t.id === activeId ? { ...t, notes: notesDraft } : t))
-      setAllTargets(prev => prev.map(t => t.id === activeId ? { ...t, notes: notesDraft } : t))
+      setTargets((prev: Target[]) => prev.map(t => t.id === activeId ? { ...t, notes: notesDraft } : t))
     } catch (e) {
       console.error(e)
     } finally {
@@ -409,8 +401,7 @@ export default function SpeedDial() {
     else updated[key] = quality
     try {
       await base44.entities.Target.update(id, { phone_qualities: updated })
-      setTargets(prev => prev.map(t => t.id === id ? { ...t, phone_qualities: updated } : t))
-      setAllTargets(prev => prev.map(t => t.id === id ? { ...t, phone_qualities: updated } : t))
+      setTargets((prev: Target[]) => prev.map(t => t.id === id ? { ...t, phone_qualities: updated } : t))
     } catch (e) { console.error(e) }
   }
 
@@ -418,13 +409,13 @@ export default function SpeedDial() {
   useEffect(() => {
     if (!incomingCall) { setIncomingTarget(null); return }
     const norm = incomingFrom.replace(/\D/g, '').replace(/^1/, '')
-    const found = allTargets.find(t =>
+    const found = targets.find(t =>
       t.contacts?.some(c =>
         c.phones.some(p => p.replace(/\D/g, '').replace(/^1/, '') === norm)
       )
     ) ?? null
     setIncomingTarget(found)
-  }, [incomingCall, incomingFrom, allTargets])
+  }, [incomingCall, incomingFrom, targets])
 
   function acceptIncoming() {
     if (!incomingCall) return
@@ -470,8 +461,7 @@ export default function SpeedDial() {
     setSaving(true)
     try {
       await base44.entities.Target.update(id, { status })
-      setTargets(prev => prev.map(t => t.id === id ? { ...t, status } : t))
-      setAllTargets(prev => prev.map(t => t.id === id ? { ...t, status } : t))
+      setTargets(prev => prev.map((t: Target) => t.id === id ? { ...t, status } : t))
       setShowOutcomeModal(false)
       setOutcomeSelection(null)
 
@@ -790,7 +780,7 @@ export default function SpeedDial() {
               ) : !activeTarget ? (
                 <motion.div key="done" className={styles.emptyState}
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  All targets worked — {stats.sold} inspections set
+                  All targets worked for today
                 </motion.div>
               ) : (
                 <motion.div

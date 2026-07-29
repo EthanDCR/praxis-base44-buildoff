@@ -37,21 +37,24 @@ function Splash({ onDone }: { onDone: () => void }) {
 }
 
 export default function App() {
-  const alreadyAuthed = localStorage.getItem('praxis_auth') === '1'
-  const [phase, setPhase] = useState<Phase>(alreadyAuthed ? 'app' : 'splash')
-  const [authed, setAuthed] = useState(alreadyAuthed)
+  const [phase, setPhase] = useState<Phase>('splash')
+
+  function onSplashDone() {
+    if (import.meta.env.DEV) { setPhase('app'); return }
+    const authed = sessionStorage.getItem('praxis_auth') === '1'
+    setPhase(authed ? 'app' : 'login')
+  }
 
   function onAuth() {
-    setAuthed(true)
     setPhase('app')
   }
 
   return (
     <AnimatePresence mode="wait">
       {phase === 'splash' && (
-        <Splash key="splash" onDone={() => setPhase('login')} />
+        <Splash key="splash" onDone={onSplashDone} />
       )}
-      {phase === 'login' && !authed && (
+      {phase === 'login' && (
         <motion.div
           key="login"
           initial={{ opacity: 0 }}
@@ -61,7 +64,7 @@ export default function App() {
           <Login onAuth={onAuth} />
         </motion.div>
       )}
-      {phase === 'app' && authed && (
+      {phase === 'app' && (
         <motion.div
           key="app"
           initial={{ opacity: 0 }}

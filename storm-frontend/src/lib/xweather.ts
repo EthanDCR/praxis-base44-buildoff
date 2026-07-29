@@ -1,13 +1,5 @@
-/**
- * XWeather (AerisWeather) data fetching.
- * Auth is injected by the Vite proxy — just call /xweather-api/... directly.
- *
- * Two layers:
- *   fetchHailReports  — ground-truth spotter reports (Points, historical)
- *   fetchStormCells   — live active storm cells with polygon forecast cones
- */
-
-const BASE = '/xweather-api'
+const XW_CID = import.meta.env.VITE_XWEATHER_CLIENT_ID as string
+const XW_CS  = import.meta.env.VITE_XWEATHER_CLIENT_SECRET as string
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,7 +25,8 @@ export interface XWStormCell {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function xwFetch(path: string): Promise<any> {
-  const res = await fetch(`${BASE}${path}`)
+  const sep = path.includes('?') ? '&' : '?'
+  const res = await fetch(`https://data.api.xweather.com${path}${sep}client_id=${XW_CID}&client_secret=${XW_CS}`)
   if (!res.ok) throw new Error(`XWeather ${res.status}: ${path}`)
   return res.json()
 }
