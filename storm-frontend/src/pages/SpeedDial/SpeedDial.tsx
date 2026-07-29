@@ -450,13 +450,13 @@ export default function SpeedDial() {
     const id     = activeId
     const status = OUTCOME_TO_STATUS[outcome]
 
-    // Multi-phone: try next number on same target before moving on
-    const currentTarget  = targets.find(t => t.id === id)
-    const allPhones      = currentTarget?.contacts?.[0]?.phones ?? []
-    const nextPhoneIdx   = activePhoneIdx + 1
-    const shouldTryNextPhone =
-      (outcome === 'voicemail' || outcome === 'no_answer' || outcome === 'dead_number') &&
-      nextPhoneIdx < allPhones.length
+    // Multi-phone: exhaust every number across all contacts before moving to next target
+    const currentTarget = targets.find(t => t.id === id)
+    const allPhones = currentTarget?.contacts?.flatMap(c =>
+      c.phones.map(p => ({ phone: p, name: c.name }))
+    ) ?? []
+    const nextPhoneIdx      = activePhoneIdx + 1
+    const shouldTryNextPhone = nextPhoneIdx < allPhones.length
 
     setSaving(true)
     try {
@@ -478,8 +478,7 @@ export default function SpeedDial() {
         // Stay on same target, dial the next phone number
         setActivePhoneIdx(nextPhoneIdx)
         if (autoDialing) {
-          const phone = allPhones[nextPhoneIdx]
-          const name  = currentTarget?.contacts?.[0]?.name ?? ''
+          const { phone, name } = allPhones[nextPhoneIdx]
           setTimeout(() => initiateCall(phone, name), 600)
         }
       } else {
