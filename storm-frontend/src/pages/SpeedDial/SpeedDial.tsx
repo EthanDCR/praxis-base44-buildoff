@@ -875,7 +875,16 @@ export default function SpeedDial() {
                                             onClick={() => setPhoneQuality(i, j, active ? null : q)}
                                             title={q}
                                           >
-                                            {q === 'good' ? '✓' : q === 'bad' ? '✕' : '?'}
+                                            <img
+                                              src="/svgs/thumbsup.png"
+                                              alt={q}
+                                              style={{
+                                                width: 13, height: 13,
+                                                transform: q === 'bad' ? 'rotate(180deg)' : q === 'unsure' ? 'rotate(90deg)' : 'none',
+                                                filter: active ? 'none' : 'grayscale(1) brightness(2)',
+                                                transition: 'filter 0.15s',
+                                              }}
+                                            />
                                           </button>
                                         )
                                       })}

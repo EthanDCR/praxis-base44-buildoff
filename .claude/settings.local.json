@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(npm install *)",
-      "WebFetch(domain:www.xweather.com)"
+      "WebFetch(domain:www.xweather.com)",
+      "Bash(npm run *)",
+      "Bash(cp vercel.json dist/)",
+      "Bash(npx vercel *)"
     ]
   }
 }
