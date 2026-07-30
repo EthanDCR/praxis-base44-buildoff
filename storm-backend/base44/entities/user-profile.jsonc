@@ -1,0 +1,40 @@
+{
+  "name": "UserProfile",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "description": "Rep's email — matches their Base44 login"
+    },
+    "full_name": {
+      "type": "string",
+      "description": "Display name"
+    },
+    "twilio_number": {
+      "type": "string",
+      "description": "Twilio phone number assigned to this rep (E.164, e.g. +15551234567)"
+    },
+    "twilio_identity": {
+      "type": "string",
+      "description": "Twilio identity string used for token generation and call routing"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["admin", "rep"],
+      "default": "rep",
+      "description": "Access role"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this rep is currently active"
+    }
+  },
+  "required": ["email"],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}

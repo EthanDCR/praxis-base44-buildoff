@@ -1,0 +1,308 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--nav-height));
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  height: 52px;
+  border-bottom: 1px solid var(--surface-border);
+  flex-shrink: 0;
+}
+
+.pageTitle {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 0;
+}
+
+/* ── User list ────────────────────────────────────────── */
+
+.listPanel {
+  width: 380px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--surface-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.listLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.addBtn {
+  padding: 5px 12px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.addBtn:hover { background: rgba(255,255,255,0.12); }
+
+.listScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.listScroll::-webkit-scrollbar { width: 4px; }
+.listScroll::-webkit-scrollbar-track { background: transparent; }
+.listScroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+.userRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.userRow:hover { background: rgba(255,255,255,0.04); }
+
+.userRowActive {
+  background: rgba(255,255,255,0.06);
+  border-color: var(--surface-border);
+}
+
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--surface-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.userInfo { flex: 1; min-width: 0; }
+
+.userName {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userEmail {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.twilioTag {
+  font-size: 0.65rem;
+  color: rgba(52,211,153,0.7);
+  margin-top: 2px;
+}
+
+.emptyList {
+  padding: 40px 16px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ── Detail/form panel ───────────────────────────────── */
+
+.detailPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 28px 32px;
+}
+
+.detailPanel::-webkit-scrollbar { width: 4px; }
+.detailPanel::-webkit-scrollbar-track { background: transparent; }
+.detailPanel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+.formTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fieldLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.input {
+  width: 100%;
+  padding: 9px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--surface-border);
+  border-radius: 3px;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.input::placeholder { color: var(--text-muted); }
+.input:focus { border-color: var(--surface-border-strong); background: rgba(255,255,255,0.06); }
+
+.divider {
+  height: 1px;
+  background: var(--surface-border);
+  margin: 8px 0;
+}
+
+.sectionLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.twilioHint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: -4px;
+}
+
+.formActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.submitBtn {
+  padding: 9px 20px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 3px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.submitBtn:hover:not(:disabled) { background: rgba(255,255,255,0.13); }
+.submitBtn:disabled { opacity: 0.45; cursor: default; }
+
+.cancelBtn {
+  padding: 9px 16px;
+  background: none;
+  border: 1px solid var(--surface-border);
+  border-radius: 3px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.cancelBtn:hover { color: var(--text-primary); border-color: var(--surface-border-strong); }
+
+.successMsg {
+  font-size: 0.8rem;
+  color: rgba(52,211,153,0.85);
+  margin-top: 4px;
+}
+
+.errorMsg {
+  font-size: 0.8rem;
+  color: #f87171;
+  margin-top: 4px;
+}
+
+.emptyDetail {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.deleteBtn {
+  margin-top: 24px;
+  padding: 8px 14px;
+  background: none;
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: rgba(239,68,68,0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+  width: fit-content;
+}
+
+.deleteBtn:hover { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.45); color: #f87171; }
