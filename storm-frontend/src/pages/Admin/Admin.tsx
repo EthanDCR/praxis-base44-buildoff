@@ -167,7 +167,7 @@ function NewUserForm({
         active: true,
       })
 
-      setSuccess(`Account created. ${fullName || email} will get a verification email before they can log in.`)
+      setSuccess(`Account created. Send ${fullName || email} their credentials to log in.`)
       onCreated(profile as UserProfile)
     } catch (err: any) {
       setError(err?.response?.data?.message ?? 'Failed to create account. Email may already be in use.')
