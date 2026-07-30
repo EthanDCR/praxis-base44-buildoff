@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { motion } from 'motion/react'
 import { base44 } from '../../lib/base44'
+import { useUser } from '../../lib/user-context'
 import styles from './Admin.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -18,16 +19,30 @@ interface UserProfile {
 type Panel = 'new' | { profile: UserProfile }
 
 export default function Admin() {
+  const currentUser = useUser()
   const [profiles, setProfiles] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [panel, setPanel] = useState<Panel | null>(null)
 
   useEffect(() => {
+    if (!currentUser?.email) return
+    // Check if the logged-in user has admin role in UserProfile
+    base44.entities.UserProfile.filter({ email: currentUser.email }, undefined, 1)
+      .then((d: any) => {
+        const profile = d[0]
+        setIsAdmin(profile?.role === 'admin')
+      })
+      .catch(() => setIsAdmin(false))
+  }, [currentUser?.email])
+
+  useEffect(() => {
+    if (!isAdmin) return
     base44.entities.UserProfile.list()
       .then((d: any) => setProfiles(d))
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [isAdmin])
 
   function openNew() { setPanel('new') }
   function openEdit(p: UserProfile) { setPanel({ profile: p }) }
@@ -49,6 +64,14 @@ export default function Admin() {
   }
 
   const activeId = panel && panel !== 'new' ? panel.profile.id : null
+
+  if (isAdmin === null) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - var(--nav-height))', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Checking access…</div>
+  }
+
+  if (isAdmin === false) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - var(--nav-height))', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Access denied.</div>
+  }
 
   return (
     <div className={styles.page}>
