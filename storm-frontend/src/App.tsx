@@ -54,6 +54,11 @@ export default function App() {
     }
   }
 
+  function onLogin(user: AppUser) {
+    setUser(user)
+    setPhase('app')
+  }
+
   return (
     <UserProvider value={user}>
       <AnimatePresence mode="wait">
@@ -67,7 +72,7 @@ export default function App() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4 }}
           >
-            <Login />
+            <Login onLogin={onLogin} />
           </motion.div>
         )}
         {phase === 'app' && (
