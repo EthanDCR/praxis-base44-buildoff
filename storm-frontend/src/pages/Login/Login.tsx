@@ -32,8 +32,8 @@ export default function Login({ onLogin }: LoginProps) {
       const user = await base44.auth.loginViaEmailPassword(email, password)
       onLogin(user as unknown as AppUser)
     } catch (err: any) {
-      if (err?.response?.status === 400) {
-        // Account exists but email not verified yet — switch to OTP step
+      const status = err?.response?.status ?? err?.status ?? err?.statusCode
+      if (status === 400 || status === 403) {
         setStep('otp')
       } else {
         triggerShake('Invalid email or password.')
@@ -82,6 +82,11 @@ export default function Login({ onLogin }: LoginProps) {
             <button className={styles.btn} type="submit" disabled={loading}>
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
+            {error && (
+              <button className={styles.switchMode} type="button" onClick={() => { setStep('otp'); setError('') }}>
+                Enter verification code instead
+              </button>
+            )}
           </form>
         ) : (
           <form className={styles.form} onSubmit={handleOtp}>
