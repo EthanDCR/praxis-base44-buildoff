@@ -103,6 +103,10 @@ export default function Login({ onLogin }: LoginProps) {
             <button className={styles.btn} type="submit" disabled={loading}>
               {loading ? 'Verifying…' : 'Verify & Sign In'}
             </button>
+            <button className={styles.switchMode} type="button" disabled={loading}
+              onClick={async () => { await base44.auth.resendOtp(email); setError(''); setOtp('') }}>
+              Resend code
+            </button>
             <button className={styles.switchMode} type="button" onClick={() => { setStep('login'); setError('') }}>
               Back
             </button>
