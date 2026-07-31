@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+
+// Inline worker via blob so Base44 hosting doesn't need to serve the worker file
+const workerBlob = new Blob(
+  [`importScripts('https://cdn.jsdelivr.net/npm/maplibre-gl@6.0.0/dist/maplibre-gl-worker.mjs')`],
+  { type: 'text/javascript' }
+)
+maplibregl.setWorkerUrl(URL.createObjectURL(workerBlob))
 import { base44 } from '../../lib/base44'
 import { motion, AnimatePresence } from 'motion/react'
 import { fetchHailReports } from '../../lib/xweather'
