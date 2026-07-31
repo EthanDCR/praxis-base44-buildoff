@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { Device, Call } from '@twilio/voice-sdk'
 import { base44 } from '../../lib/base44'
+import { useDataStore } from '../../lib/data-store'
 import styles from './SpeedDial.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -35,7 +36,6 @@ interface Target {
   notes?: string
 }
 
-interface CallList { id: string; name: string }
 interface Utterance { speaker: 'agent' | 'contact'; text: string; ts: number }
 
 type Filter = 'all' | 'new' | 'callback' | 'called' | 'not_interested'
@@ -119,12 +119,18 @@ export default function SpeedDial() {
   const location = useLocation()
   const navState = (location.state ?? {}) as { targetId?: string; listId?: string }
 
-  const [lists, setLists]               = useState<CallList[]>([])
+  const { lists, targets: storeTargets, loading: loadingTargets, updateTarget } = useDataStore()
   const [activeListId, setActiveListId] = useState<string | null>(null)
-  const [targets, setTargets]           = useState<Target[]>([])
   const [activeId, setActiveId]         = useState<string | null>(null)
   const [filter, setFilter]             = useState<Filter>('all')
-  const [loadingTargets, setLoadingTargets] = useState(false)
+
+  // Derive targets for the selected list, excluding sold
+  const targets = useMemo((): Target[] => {
+    const byList = activeListId
+      ? (storeTargets as Target[]).filter(t => t.list_id === activeListId)
+      : (storeTargets as Target[])
+    return byList.filter(t => t.status !== 'sold')
+  }, [storeTargets, activeListId])
   const [saving, setSaving]             = useState(false)
   const [showListDrop, setShowListDrop]     = useState(false)
   const [showFilterDrop, setShowFilterDrop] = useState(false)
@@ -172,14 +178,29 @@ export default function SpeedDial() {
   const deviceRef        = useRef<Device | null>(null)
   const activeCallRef    = useRef<Call | null>(null)
 
+  // Restore nav state list selection once lists are loaded
   useEffect(() => {
-    base44.entities.CallList.list()
-      .then((d: any) => {
-        setLists(d)
-        if (navState.listId) setActiveListId(navState.listId)
-      })
-      .catch(console.error)
-  }, [])
+    if (navState.listId && lists.length > 0) setActiveListId(navState.listId)
+  }, [lists])
+
+  // Reset selection when list changes, then auto-select the first workable target
+  const prevListIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (prevListIdRef.current !== activeListId) {
+      prevListIdRef.current = activeListId
+      setActiveId(null)
+      setAutoDialing(false)
+    }
+  }, [activeListId])
+
+  useEffect(() => {
+    setActiveId(prev => {
+      if (prev) return prev
+      if (navState.targetId && targets.find((t: Target) => t.id === navState.targetId)) return navState.targetId
+      const first = targets.find((t: Target) => t.status === 'new' || t.status === 'callback')
+      return first?.id ?? null
+    })
+  }, [targets])
 
   // Initialize Twilio Device
   useEffect(() => {
@@ -216,28 +237,6 @@ export default function SpeedDial() {
     setup()
     return () => { device?.destroy() }
   }, [])
-
-  // Load targets — filtered by list if one is selected
-  useEffect(() => {
-    setLoadingTargets(true)
-    setTargets([])
-    setActiveId(null)
-    setAutoDialing(false)
-    const query = activeListId ? { list_id: activeListId } : {}
-    base44.entities.Target.filter(query, undefined, 2000)
-      .then((d: any) => {
-        const working = d.filter((t: Target) => t.status !== 'sold')
-        setTargets(working)
-        if (navState.targetId && working.find((t: Target) => t.id === navState.targetId)) {
-          setActiveId(navState.targetId)
-        } else {
-          const first = working.find((t: Target) => t.status === 'new' || t.status === 'callback')
-          if (first) setActiveId(first.id)
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoadingTargets(false))
-  }, [activeListId])
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -387,8 +386,7 @@ export default function SpeedDial() {
     if (!activeId || noteSaving) return
     setNoteSaving(true)
     try {
-      await base44.entities.Target.update(activeId, { notes: notesDraft })
-      setTargets((prev: Target[]) => prev.map(t => t.id === activeId ? { ...t, notes: notesDraft } : t))
+      await updateTarget(activeId, { notes: notesDraft })
     } catch (e) {
       console.error(e)
     } finally {
@@ -405,8 +403,7 @@ export default function SpeedDial() {
     if (quality === null) delete updated[key]
     else updated[key] = quality
     try {
-      await base44.entities.Target.update(id, { phone_qualities: updated })
-      setTargets((prev: Target[]) => prev.map(t => t.id === id ? { ...t, phone_qualities: updated } : t))
+      await updateTarget(id, { phone_qualities: updated })
     } catch (e) { console.error(e) }
   }
 
@@ -465,8 +462,7 @@ export default function SpeedDial() {
 
     setSaving(true)
     try {
-      await base44.entities.Target.update(id, { status })
-      setTargets(prev => prev.map((t: Target) => t.id === id ? { ...t, status } : t))
+      await updateTarget(id, { status })
       setShowOutcomeModal(false)
       setOutcomeSelection(null)
 

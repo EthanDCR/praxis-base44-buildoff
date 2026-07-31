@@ -12,6 +12,7 @@ import Admin from './pages/Admin/Admin'
 import Login from './pages/Login/Login'
 import { base44 } from './lib/base44'
 import { UserProvider, type AppUser } from './lib/user-context'
+import { DataStoreProvider } from './lib/data-store'
 
 type Phase = 'splash' | 'login' | 'app'
 
@@ -77,24 +78,26 @@ export default function App() {
           </motion.div>
         )}
         {phase === 'app' && (
-          <motion.div
-            key="app"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.35 }}
-            style={{ height: '100%' }}
-          >
-            <BrowserRouter>
-              <Navbar />
-              <Routes>
-                <Route path="/" element={<HailMap />} />
-                <Route path="/speed-dial" element={<SpeedDial />} />
-                <Route path="/leads" element={<Leads />} />
-                <Route path="/overwatch" element={<Overwatch />} />
-                <Route path="/admin" element={<Admin />} />
-              </Routes>
-            </BrowserRouter>
-          </motion.div>
+          <DataStoreProvider>
+            <motion.div
+              key="app"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35 }}
+              style={{ height: '100%' }}
+            >
+              <BrowserRouter>
+                <Navbar />
+                <Routes>
+                  <Route path="/" element={<HailMap />} />
+                  <Route path="/speed-dial" element={<SpeedDial />} />
+                  <Route path="/leads" element={<Leads />} />
+                  <Route path="/overwatch" element={<Overwatch />} />
+                  <Route path="/admin" element={<Admin />} />
+                </Routes>
+              </BrowserRouter>
+            </motion.div>
+          </DataStoreProvider>
         )}
       </AnimatePresence>
     </UserProvider>

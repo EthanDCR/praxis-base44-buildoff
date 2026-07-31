@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { base44 } from '../../lib/base44'
+import { useDataStore } from '../../lib/data-store'
 import styles from './Overwatch.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -28,16 +28,13 @@ interface Target {
 }
 
 export default function Overwatch() {
-  const [targets, setTargets] = useState<Target[]>([])
-  const [loading, setLoading] = useState(true)
+  const { targets: storeTargets, loading } = useDataStore()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    base44.entities.Target.filter({ status: 'overwatch' }, undefined, 1000)
-      .then((d: any) => setTargets(d))
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
+  const targets = useMemo(
+    () => storeTargets.filter((t: Target) => t.status === 'overwatch'),
+    [storeTargets]
+  )
 
   return (
     <div className={styles.page}>

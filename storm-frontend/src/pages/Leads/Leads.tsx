@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { base44 } from '../../lib/base44'
+import { useDataStore } from '../../lib/data-store'
 import styles from './Leads.module.css'
 
 const ChevronDown = () => (
@@ -30,41 +30,18 @@ interface Target {
   created_at?: string
 }
 
-interface CallList {
-  id: string
-  name: string
-  list_status?: ListStatus
-}
-
-type ListStatus = 'not_started' | 'in_progress' | 'completed' | 'on_hold'
 
 export default function Leads() {
-  const [lists, setLists]                   = useState<CallList[]>([])
+  const { lists, targets: storeTargets, loading, updateTarget } = useDataStore()
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
-  const [allTargets, setAllTargets]         = useState<Target[]>([])
-  const [loading, setLoading]               = useState(false)
   const [listPickerOpen, setListPickerOpen] = useState(false)
   const [sending, setSending]               = useState<Record<string, 'damage' | 'no_damage'>>({})
   const [dismissedWith, setDismissedWith]   = useState<Record<string, 'damage' | 'no_damage'>>({})
   const [dismissed, setDismissed]           = useState<Set<string>>(new Set())
   const listPickerRef                       = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    base44.entities.CallList.list().then((d: any) => setLists(d)).catch(console.error)
-  }, [])
-
-  useEffect(() => {
-    setLoading(true)
-    base44.entities.Target.list()
-      .then((d: any) => {
-        const sorted = [...d].sort((a: Target, b: Target) =>
-          (b.created_at ?? '').localeCompare(a.created_at ?? '')
-        )
-        setAllTargets(sorted)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
+  const allTargets = [...storeTargets]
+    .sort((a: Target, b: Target) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -78,7 +55,7 @@ export default function Leads() {
   function handleResult(id: string, result: 'damage' | 'no_damage') {
     setSending(s => ({ ...s, [id]: result }))
     const newStatus = result === 'damage' ? 'crm_sent' : 'overwatch'
-    base44.entities.Target.update(id, { status: newStatus }).catch(console.error)
+    updateTarget(id, { status: newStatus }).catch(console.error)
     setTimeout(() => {
       setDismissedWith(s => ({ ...s, [id]: result }))
       setDismissed(s => new Set([...s, id]))
