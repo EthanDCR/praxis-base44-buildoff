@@ -130,7 +130,9 @@ export default function SpeedDial() {
   const location = useLocation()
   const navState = (location.state ?? {}) as { targetId?: string; listId?: string }
 
-  const { lists, targets: storeTargets, loading: loadingTargets, updateTarget } = useDataStore()
+  const { lists, targets: storeTargets, loading: loadingTargets, updateTarget, refresh } = useDataStore()
+
+  useEffect(() => { refresh() }, [])
   const [activeListId, setActiveListId] = useState<string | null>(null)
   const [activeId, setActiveId]         = useState<string | null>(null)
   const [filter, setFilter]             = useState<Filter>('all')
@@ -1022,36 +1024,14 @@ export default function SpeedDial() {
             <div className={styles.propDataSection}>
               <div className={styles.panelLabel}>Property Data</div>
               <div className={styles.propDataGrid}>
-                {/* col 1 */}
-                <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Type</span>
-                  <span className={styles.propDataVal}>{activeTarget?.property_type ?? '—'}</span>
-                </div>
-                {/* col 2 */}
-                <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Roof Material</span>
-                  <span className={styles.propDataVal}>{activeTarget?.roof_material ?? '—'}</span>
-                </div>
-
-                <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Subtype</span>
-                  <span className={styles.propDataVal}>{activeTarget?.property_subtype ?? '—'}</span>
-                </div>
-                <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Est. Value</span>
-                  <span className={styles.propDataVal}>
-                    {activeTarget?.estimated_value ? '$' + activeTarget.estimated_value.toLocaleString() : '—'}
-                  </span>
-                </div>
-
                 <div className={styles.propDataRow}>
                   <span className={styles.propDataKey}>Year Built</span>
                   <span className={styles.propDataVal}>{activeTarget?.year_built ?? '—'}</span>
                 </div>
                 <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Equity</span>
+                  <span className={styles.propDataKey}>Est. Value</span>
                   <span className={styles.propDataVal}>
-                    {activeTarget?.equity_percent != null ? `${activeTarget.equity_percent}%` : '—'}
+                    {activeTarget?.estimated_value ? '$' + activeTarget.estimated_value.toLocaleString() : '—'}
                   </span>
                 </div>
 
@@ -1063,9 +1043,9 @@ export default function SpeedDial() {
                 </div>
 
                 <div className={`${styles.propDataRow} ${styles.propDataRowFull}`}>
-                  <span className={styles.propDataKey}>Roof Age</span>
+                  <span className={styles.propDataKey}>Equity</span>
                   <span className={styles.propDataVal}>
-                    {activeTarget?.roof_age != null ? `${activeTarget.roof_age} yrs` : '—'}
+                    {activeTarget?.equity_percent != null ? `${activeTarget.equity_percent}%` : '—'}
                   </span>
                 </div>
               </div>

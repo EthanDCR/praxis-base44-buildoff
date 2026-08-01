@@ -23,7 +23,7 @@ Deno.serve(async (req: Request) => {
     return Response.json({ error: "address required" }, { status: 400 })
   }
 
-  const dmRes = await fetch("https://api.v2.dealmachine.com/v1/enrichment/enrich-by-address", {
+  const dmRes = await fetch("https://api.v2.dealmachine.com/v1/enrichment/address", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${DM_API_KEY}`,
@@ -31,19 +31,20 @@ Deno.serve(async (req: Request) => {
     },
     body: JSON.stringify({
       data: [{ full_address: address }],
-      fields: [
-        "year_built", "square_footage", "roof_age", "roof_material",
-        "property_type", "property_subtype", "estimated_value", "equity_percent",
-      ],
+      fields: ["estimated_equity_percentage", "estimated_equity_amount"],
       contact_audience: "owners",
     }),
   })
 
   if (!dmRes.ok) {
+    // 404 means DealMachine has no record for this address — treat as no match
+    if (dmRes.status === 404) {
+      return Response.json({ matched: false }, { headers: CORS })
+    }
     const detail = await dmRes.text()
     return Response.json(
       { error: `DealMachine error: ${dmRes.status}`, detail },
-      { status: dmRes.status, headers: CORS }
+      { status: 502, headers: CORS }
     )
   }
 
@@ -62,15 +63,11 @@ Deno.serve(async (req: Request) => {
 
   return Response.json({
     matched:          true,
-    dm_property_id:   result.dm_property_id,
-    property_type:    result.property_type ?? null,
-    property_subtype: result.property_subtype ?? null,
+    dm_property_id:   result.dm_property_id ?? null,
     year_built:       result.year_built != null ? String(result.year_built) : null,
-    square_footage:   result.square_footage ?? null,
-    roof_age:         result.roof_age ?? null,
-    roof_material:    result.roof_material ?? null,
+    square_footage:   result.living_area_sqft ?? null,
     estimated_value:  result.estimated_value ?? null,
-    equity_percent:   result.equity_percent ?? null,
+    equity_percent:   result.estimated_equity_percentage ?? null,
     contacts,
   }, { headers: CORS })
 })

@@ -45,7 +45,7 @@ function hailColor(size: number): string {
 }
 
 
-interface SelectedAddress { display: string; line1: string; line2: string; lat: number; lng: number }
+interface SelectedAddress { display: string; line1: string; line2: string; zip: string; lat: number; lng: number }
 interface HoverInfo { x: number; y: number; props: Record<string, any>; kind: 'mrms' | 'xw' }
 
 function SidebarSection({ children, delay }: { children: React.ReactNode; delay: number }) {
@@ -236,7 +236,8 @@ export default function HailMap() {
         const a    = data.address ?? {}
         const line1 = [a.house_number, a.road].filter(Boolean).join(' ') || data.display_name?.split(',')[0]
         const line2 = [a.city || a.town || a.village, a.state].filter(Boolean).join(', ')
-        setSelectedAddress({ display: data.display_name, line1, line2, lat, lng })
+        const zip   = a.postcode ?? ''
+        setSelectedAddress({ display: data.display_name, line1, line2, zip, lat, lng })
       } catch {}
     })
 
@@ -355,7 +356,7 @@ export default function HailMap() {
     if (!selectedAddress || !activeListId || addingTarget) return
     setAddingTarget(true)
     try {
-      const fullAddress = [selectedAddress.line1, selectedAddress.line2].filter(Boolean).join(', ')
+      const fullAddress = [selectedAddress.line1, selectedAddress.line2, selectedAddress.zip].filter(Boolean).join(', ')
       let enrichment: Record<string, any> = {}
       try {
         const res = await base44.functions.invoke('dm-enrich', { address: fullAddress }) as any
