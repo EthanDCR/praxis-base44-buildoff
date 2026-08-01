@@ -9,6 +9,9 @@ import styles from './HailMap.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 const NOMINATIM = 'https://nominatim.openstreetmap.org'
+const GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY as string
+const PLACES_AUTOCOMPLETE = 'https://places.googleapis.com/v1/places:autocomplete'
+const PLACES_DETAILS      = 'https://places.googleapis.com/v1/places'
 
 const DARK_TILES = [
   'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
@@ -70,7 +73,7 @@ export default function HailMap() {
   // ── Search ──────────────────────────────────────────────
   const [searchQuery, setSearchQuery]         = useState('')
   const [searching, setSearching]             = useState(false)
-  const [suggestions, setSuggestions]         = useState<{ place_id: number; display_name: string; lat: string; lon: string }[]>([])
+  const [suggestions, setSuggestions]         = useState<{ placeId: string; text: string }[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const searchWrapperRef = useRef<HTMLDivElement>(null)
 
@@ -299,45 +302,51 @@ export default function HailMap() {
     if (q.length < 2) { setSuggestions([]); return }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `${NOMINATIM}/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=us`,
-          { headers: { 'Accept-Language': 'en' } }
-        )
-        setSuggestions(await res.json())
-        setShowSuggestions(true)
+        const res = await fetch(PLACES_AUTOCOMPLETE, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': GOOGLE_PLACES_KEY,
+            'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text',
+          },
+          body: JSON.stringify({ input: q, includedRegionCodes: ['us'] }),
+        })
+        const data = await res.json()
+        const items = (data.suggestions ?? []).map((s: any) => ({
+          placeId: s.placePrediction.placeId,
+          text:    s.placePrediction.text.text,
+        }))
+        setSuggestions(items)
+        setShowSuggestions(items.length > 0)
       } catch {}
-    }, 300)
+    }, 250)
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  const handleSearch = useCallback(async () => {
-    if (!searchQuery.trim()) return
+  const flyToPlace = useCallback(async (placeId: string, label: string) => {
     setSearching(true); setSuggestions([]); setShowSuggestions(false)
     try {
-      const res     = await fetch(
-        `${NOMINATIM}/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=us`,
-        { headers: { 'Accept-Language': 'en' } }
-      )
-      const results = await res.json()
-      if (results.length > 0) {
-        mapRef.current?.flyTo({
-          center: [parseFloat(results[0].lon), parseFloat(results[0].lat)],
-          zoom: 10,
-          duration: 1500,
-        })
-      }
-    } finally { setSearching(false) }
-  }, [searchQuery])
+      const res  = await fetch(`${PLACES_DETAILS}/${placeId}`, {
+        headers: {
+          'X-Goog-Api-Key': GOOGLE_PLACES_KEY,
+          'X-Goog-FieldMask': 'location',
+        },
+      })
+      const data = await res.json()
+      const { latitude, longitude } = data.location
+      mapRef.current?.flyTo({ center: [longitude, latitude], zoom: 11, duration: 1500 })
+      setSearchQuery(label.split(',')[0])
+    } catch {} finally { setSearching(false) }
+  }, [])
 
-  const handleSelectSuggestion = (s: { lat: string; lon: string; display_name: string }) => {
-    mapRef.current?.flyTo({
-      center: [parseFloat(s.lon), parseFloat(s.lat)],
-      zoom: 10,
-      duration: 1500,
-    })
-    setSearchQuery(s.display_name.split(',')[0])
-    setSuggestions([])
-    setShowSuggestions(false)
+  const handleSearch = useCallback(async () => {
+    if (suggestions.length > 0) {
+      flyToPlace(suggestions[0].placeId, suggestions[0].text)
+    }
+  }, [suggestions, flyToPlace])
+
+  const handleSelectSuggestion = (s: { placeId: string; text: string }) => {
+    flyToPlace(s.placeId, s.text)
   }
 
   // ── List management ──────────────────────────────────────
@@ -449,10 +458,10 @@ export default function HailMap() {
             {showSuggestions && suggestions.length > 0 && (
               <div className={styles.suggestions}>
                 {suggestions.map(s => {
-                  const parts = s.display_name.split(',')
+                  const parts = s.text.split(',')
                   return (
                     <button
-                      key={s.place_id}
+                      key={s.placeId}
                       className={styles.suggestion}
                       onMouseDown={() => handleSelectSuggestion(s)}
                     >
