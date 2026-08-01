@@ -377,9 +377,27 @@ export default function SpeedDial() {
   function startAutoDialing() {
     setAutoDialing(true)
     setActivePhoneIdx(0)
-    const phone = activeTarget?.contacts?.[0]?.phones?.[0]
-    const name  = activeTarget?.contacts?.[0]?.name ?? ''
-    if (phone) initiateCall(phone, name)
+
+    const allPhones = activeTarget?.contacts?.flatMap(c =>
+      c.phones.map(p => ({ phone: p, name: c.name }))
+    ) ?? []
+
+    if (allPhones[0]) {
+      initiateCall(allPhones[0].phone, allPhones[0].name)
+    } else {
+      // Active target has no phones — advance to the first one that does
+      const idx  = activeTarget ? targets.findIndex(t => t.id === activeTarget.id) : -1
+      const pool = [...targets.slice(idx + 1), ...targets.slice(0, idx + 1)]
+      const next = pool.find(t =>
+        (t.status === 'new' || t.status === 'callback') &&
+        t.contacts?.some(c => c.phones.length > 0)
+      )
+      if (next) {
+        setActiveId(next.id)
+        const phones = next.contacts!.flatMap(c => c.phones.map(p => ({ phone: p, name: c.name })))
+        if (phones[0]) initiateCall(phones[0].phone, phones[0].name)
+      }
+    }
   }
 
   async function saveNote() {
