@@ -9,7 +9,6 @@ import type { XWHailReport } from '../../lib/xweather'
 import styles from './HailMap.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
-const NOMINATIM = 'https://nominatim.openstreetmap.org'
 const GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY as string
 const PLACES_AUTOCOMPLETE = 'https://places.googleapis.com/v1/places:autocomplete'
 const PLACES_DETAILS      = 'https://places.googleapis.com/v1/places'
@@ -224,20 +223,27 @@ export default function HailMap() {
       map.getCanvas().style.cursor = ''
     })
 
-    // Click → reverse geocode
+    // Click → reverse geocode (Google snaps to nearest address)
     map.on('click', async (e: any) => {
       const { lng, lat } = e.lngLat
       try {
         const res  = await fetch(
-          `${NOMINATIM}/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
-          { headers: { 'Accept-Language': 'en' } }
+          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_PLACES_KEY}`
         )
         const data = await res.json()
-        const a    = data.address ?? {}
-        const line1 = [a.house_number, a.road].filter(Boolean).join(' ') || data.display_name?.split(',')[0]
-        const line2 = [a.city || a.town || a.village, a.state].filter(Boolean).join(', ')
-        const zip   = a.postcode ?? ''
-        setSelectedAddress({ display: data.display_name, line1, line2, zip, lat, lng })
+        const result = data.results?.[0]
+        if (!result) return
+        const comps: any[] = result.address_components ?? []
+        const get = (...types: string[]) =>
+          comps.find((c: any) => types.every(t => c.types.includes(t)))?.long_name ?? ''
+        const streetNumber = get('street_number')
+        const route        = get('route')
+        const city         = get('locality') || get('sublocality') || get('administrative_area_level_3')
+        const state        = get('administrative_area_level_1')
+        const zip          = get('postal_code')
+        const line1 = [streetNumber, route].filter(Boolean).join(' ') || result.formatted_address.split(',')[0]
+        const line2 = [city, state].filter(Boolean).join(', ')
+        setSelectedAddress({ display: result.formatted_address, line1, line2, zip, lat, lng })
       } catch {}
     })
 
