@@ -13,9 +13,6 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       exclude: ['maplibre-gl'],
     },
-    worker: {
-      format: 'es',
-    },
     server: {
       allowedHosts: true,
       proxy: {
