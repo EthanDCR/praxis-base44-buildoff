@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { base44 } from '../../lib/base44'
+import { useDataStore } from '../../lib/data-store'
 import { motion, AnimatePresence } from 'motion/react'
 import { fetchHailReports } from '../../lib/xweather'
 import type { XWHailReport } from '../../lib/xweather'
@@ -81,17 +82,8 @@ export default function HailMap() {
   const [rangeDays, setRangeDays] = useState(7)
   const [minSize, setMinSize]     = useState(1.0)
 
-  // ── MRMS data ────────────────────────────────────────────
-  const [mrmsFeatures, setMrmsFeatures] = useState<any[]>([])
-  useEffect(() => {
-    base44.entities.HailSwath.filter({}, undefined, 500)
-      .then((data: any) => {
-        const arr = Array.isArray(data) ? data : (data?.data ?? [])
-        console.log('[HailSwath] loaded', arr.length, 'records', arr[0])
-        setMrmsFeatures(arr)
-      })
-      .catch(e => console.error('[HailSwath] fetch error', e))
-  }, [])
+  // ── MRMS data (from shared DataStore) ────────────────────
+  const { swaths: mrmsFeatures, lists: storeLists, refresh: refreshStore } = useDataStore()
 
   // ── XWeather reports ─────────────────────────────────────
   const [xwReports, setXwReports] = useState<XWHailReport[]>([])
@@ -103,7 +95,7 @@ export default function HailMap() {
 
   // ── Property / list state ────────────────────────────────
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null)
-  const [lists, setLists]               = useState<{ id: string; name: string }[]>([])
+  const lists       = storeLists as { id: string; name: string }[]
   const [activeListId, setActiveListId] = useState<string | null>(null)
   const [showNewList, setShowNewList]   = useState(false)
   const [newListName, setNewListName]   = useState('')
@@ -111,10 +103,6 @@ export default function HailMap() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [addingTarget, setAddingTarget] = useState(false)
   const [addedFeedback, setAddedFeedback] = useState(false)
-
-  useEffect(() => {
-    base44.entities.CallList.list().then((data: any) => setLists(data)).catch(console.error)
-  }, [])
 
   // ── GeoJSON memos ────────────────────────────────────────
   const mrmsGeoJSON = useMemo(() => {
@@ -355,7 +343,7 @@ export default function HailMap() {
     setCreatingList(true)
     try {
       const list = await base44.entities.CallList.create({ name: newListName.trim() }) as any
-      setLists(prev => [...prev, list])
+      await refreshStore()
       setActiveListId(list.id)
       setNewListName('')
       setShowNewList(false)
