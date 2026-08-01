@@ -8,11 +8,16 @@ import styles from './SpeedDial.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
+interface Phone {
+  number: string
+  type?: string | null
+}
+
 interface Contact {
   name: string
   company?: string
   title?: string
-  phones: string[]
+  phones: Phone[]
   emails: string[]
 }
 
@@ -30,6 +35,12 @@ interface Target {
   property_type?: string
   property_subtype?: string
   year_built?: string
+  square_footage?: number
+  roof_age?: number
+  roof_material?: string
+  estimated_value?: number
+  equity_percent?: number
+  dm_property_id?: string
   contacts?: Contact[]
   status: 'new' | 'called' | 'callback' | 'not_interested' | 'sold'
   phone_qualities?: Record<string, NumberQuality>
@@ -379,7 +390,7 @@ export default function SpeedDial() {
     setActivePhoneIdx(0)
 
     const allPhones = activeTarget?.contacts?.flatMap(c =>
-      c.phones.map(p => ({ phone: p, name: c.name }))
+      c.phones.map(p => ({ phone: p.number, name: c.name }))
     ) ?? []
 
     if (allPhones[0]) {
@@ -394,7 +405,7 @@ export default function SpeedDial() {
       )
       if (next) {
         setActiveId(next.id)
-        const phones = next.contacts!.flatMap(c => c.phones.map(p => ({ phone: p, name: c.name })))
+        const phones = next.contacts!.flatMap(c => c.phones.map(p => ({ phone: p.number, name: c.name })))
         if (phones[0]) initiateCall(phones[0].phone, phones[0].name)
       }
     }
@@ -431,7 +442,7 @@ export default function SpeedDial() {
     const norm = incomingFrom.replace(/\D/g, '').replace(/^1/, '')
     const found = targets.find(t =>
       t.contacts?.some(c =>
-        c.phones.some(p => p.replace(/\D/g, '').replace(/^1/, '') === norm)
+        c.phones.some(p => p.number.replace(/\D/g, '').replace(/^1/, '') === norm)
       )
     ) ?? null
     setIncomingTarget(found)
@@ -473,7 +484,7 @@ export default function SpeedDial() {
     // Multi-phone: exhaust every number across all contacts before moving to next target
     const currentTarget = targets.find(t => t.id === id)
     const allPhones = currentTarget?.contacts?.flatMap(c =>
-      c.phones.map(p => ({ phone: p, name: c.name }))
+      c.phones.map(p => ({ phone: p.number, name: c.name }))
     ) ?? []
     const nextPhoneIdx      = activePhoneIdx + 1
     const shouldTryNextPhone = nextPhoneIdx < allPhones.length
@@ -506,7 +517,7 @@ export default function SpeedDial() {
         const next = findNext(id)
         setActiveId(next?.id ?? null)
         if (autoDialing && next) {
-          const phone = next.contacts?.[0]?.phones?.[0]
+          const phone = next.contacts?.[0]?.phones?.[0]?.number
           const name  = next.contacts?.[0]?.name ?? ''
           if (phone) setTimeout(() => initiateCall(phone, name), 600)
         }
@@ -887,14 +898,19 @@ export default function SpeedDial() {
                             <div className={styles.contactSection}>
                               <div className={styles.contactSectionLabel}>Phones</div>
                               {c.phones.map((p, j) => {
-                                const isActive = dialerPhone === p
+                                const isActive = dialerPhone === p.number
                                 return (
                                   <div
                                     key={j}
                                     ref={isActive ? activePhoneRef : null}
                                     className={`${styles.phoneRow} ${isActive ? styles.phoneRowActive : ''}`}
                                   >
-                                    <span className={`${styles.phone} ${isActive ? styles.phoneActive : ''}`}>{p}</span>
+                                    <span className={`${styles.phone} ${isActive ? styles.phoneActive : ''}`}>{p.number}</span>
+                                    {p.type && (
+                                      <span className={styles.phoneTypeBadge}>
+                                        {p.type === 'wireless' ? 'mobile' : p.type}
+                                      </span>
+                                    )}
                                     <div className={styles.phoneQuality}>
                                       {(['good', 'unsure', 'bad'] as NumberQuality[]).map(q => {
                                         const key = `${i}_${j}`
@@ -922,7 +938,7 @@ export default function SpeedDial() {
                                     </div>
                                     <button
                                       className={`${styles.dialLoadBtn} ${isActive ? styles.dialLoadBtnActive : ''}`}
-                                      onClick={() => loadDialer(p, c.name)}
+                                      onClick={() => loadDialer(p.number, c.name)}
                                       title={isActive ? 'Loaded' : 'Dial'}
                                     >
                                       <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
@@ -996,36 +1012,58 @@ export default function SpeedDial() {
             <div className={styles.propDataSection}>
               <div className={styles.panelLabel}>Property Data</div>
               <div className={styles.propDataGrid}>
+                {/* col 1 */}
                 <div className={styles.propDataRow}>
                   <span className={styles.propDataKey}>Type</span>
                   <span className={styles.propDataVal}>{activeTarget?.property_type ?? '—'}</span>
                 </div>
+                {/* col 2 */}
+                <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Roof Material</span>
+                  <span className={styles.propDataVal}>{activeTarget?.roof_material ?? '—'}</span>
+                </div>
+
                 <div className={styles.propDataRow}>
                   <span className={styles.propDataKey}>Subtype</span>
                   <span className={styles.propDataVal}>{activeTarget?.property_subtype ?? '—'}</span>
                 </div>
                 <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Est. Value</span>
+                  <span className={styles.propDataVal}>
+                    {activeTarget?.estimated_value ? '$' + activeTarget.estimated_value.toLocaleString() : '—'}
+                  </span>
+                </div>
+
+                <div className={styles.propDataRow}>
                   <span className={styles.propDataKey}>Year Built</span>
                   <span className={styles.propDataVal}>{activeTarget?.year_built ?? '—'}</span>
                 </div>
                 <div className={styles.propDataRow}>
+                  <span className={styles.propDataKey}>Equity</span>
+                  <span className={styles.propDataVal}>
+                    {activeTarget?.equity_percent != null ? `${activeTarget.equity_percent}%` : '—'}
+                  </span>
+                </div>
+
+                <div className={`${styles.propDataRow} ${styles.propDataRowFull}`}>
                   <span className={styles.propDataKey}>Sq Footage</span>
-                  <span className={styles.propDataVal}>—</span>
+                  <span className={styles.propDataVal}>
+                    {activeTarget?.square_footage ? activeTarget.square_footage.toLocaleString() + ' sq ft' : '—'}
+                  </span>
                 </div>
-                <div className={styles.propDataRow}>
+
+                <div className={`${styles.propDataRow} ${styles.propDataRowFull}`}>
                   <span className={styles.propDataKey}>Roof Age</span>
-                  <span className={styles.propDataVal}>—</span>
-                </div>
-                <div className={styles.propDataRow}>
-                  <span className={styles.propDataKey}>Roof Material</span>
-                  <span className={styles.propDataVal}>—</span>
+                  <span className={styles.propDataVal}>
+                    {activeTarget?.roof_age != null ? `${activeTarget.roof_age} yrs` : '—'}
+                  </span>
                 </div>
               </div>
 
             </div>
           </div>
 
-          {/* ── Right panel: dialer + transcript ──────────────────── */}
+          {/* ── Right panel: dialer + extra property fields ───────── */}
           <div className={styles.rightPanel}>
 
             {/* Dialer */}
@@ -1079,6 +1117,7 @@ export default function SpeedDial() {
                 </span>
               </div>
             </div>
+
 
 
           </div>

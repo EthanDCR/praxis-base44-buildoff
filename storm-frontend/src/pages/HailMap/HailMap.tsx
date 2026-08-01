@@ -355,12 +355,25 @@ export default function HailMap() {
     if (!selectedAddress || !activeListId || addingTarget) return
     setAddingTarget(true)
     try {
+      const fullAddress = [selectedAddress.line1, selectedAddress.line2].filter(Boolean).join(', ')
+      let enrichment: Record<string, any> = {}
+      try {
+        const dm = await base44.functions.invoke('dm-enrich', { address: fullAddress }) as any
+        if (dm?.matched) {
+          const { matched: _m, ...fields } = dm
+          enrichment = Object.fromEntries(Object.entries(fields).filter(([, v]) => v != null))
+        }
+      } catch (e) {
+        console.warn('DealMachine enrichment failed, creating target without data', e)
+      }
+
       await base44.entities.Target.create({
         list_id: activeListId,
         line1:   selectedAddress.line1,
         line2:   selectedAddress.line2,
         lat:     selectedAddress.lat,
         lng:     selectedAddress.lng,
+        ...enrichment,
       })
       setAddedFeedback(true)
       setTimeout(() => setAddedFeedback(false), 2000)
@@ -569,26 +582,6 @@ export default function HailMap() {
           )}
         </SidebarSection>
 
-
-        <SidebarSection delay={0.36}>
-          <h3 className={styles.sectionLabel}>Selected Property</h3>
-          {selectedAddress ? (
-            <>
-              <p className={styles.addrLine1}>{selectedAddress.line1}</p>
-              <p className={styles.addrLine2}>{selectedAddress.line2}</p>
-              <button
-                className={`${styles.addBtn} ${!activeListId ? styles.addBtnDisabled : ''}`}
-                onClick={handleAddTarget}
-                disabled={!activeListId || addingTarget}
-              >
-                {addingTarget ? 'Adding…' : addedFeedback ? '✓ Added' : '+ Add to List'}
-              </button>
-            </>
-          ) : (
-            <p className={styles.noSelection}>Click a location on the map</p>
-          )}
-        </SidebarSection>
-
       </div>
 
       {/* ── Map ──────────────────────────────────────── */}
@@ -599,6 +592,21 @@ export default function HailMap() {
         transition={{ duration: 1.05, ease: EASE, delay: 0.1 }}
       >
         <div ref={containerRef} className={styles.map} />
+
+        {selectedAddress && (
+          <div className={styles.selectedPropertyCard}>
+            <p className={styles.selectedPropertyLabel}>Selected Property</p>
+            <p className={styles.addrLine1}>{selectedAddress.line1}</p>
+            <p className={styles.addrLine2}>{selectedAddress.line2}</p>
+            <button
+              className={`${styles.addBtn} ${!activeListId ? styles.addBtnDisabled : ''}`}
+              onClick={handleAddTarget}
+              disabled={!activeListId || addingTarget}
+            >
+              {addingTarget ? 'Adding…' : addedFeedback ? '✓ Added' : '+ Add to List'}
+            </button>
+          </div>
+        )}
 
         {hoverInfo && (
           <div className={styles.hoverTip}>

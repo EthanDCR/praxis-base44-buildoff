@@ -15,7 +15,7 @@ interface Contact {
   name: string
   company?: string
   title?: string
-  phones: string[]
+  phones: Array<{ number: string; type?: string | null }>
   emails: string[]
 }
 
@@ -132,7 +132,7 @@ export default function Leads() {
           <AnimatePresence mode="popLayout">
             {!loading && targets.filter(t => !dismissed.has(t.id)).map((t, i) => {
               const c        = t.contacts?.[0]
-              const phone    = c?.phones?.[0]
+              const phone    = c?.phones?.[0]?.number
               const isSending = !!sending[t.id]
               const sentType  = sending[t.id]
               return (

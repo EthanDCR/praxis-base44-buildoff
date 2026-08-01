@@ -1,5 +1,4 @@
-const XW_CID = import.meta.env.VITE_XWEATHER_CLIENT_ID as string
-const XW_CS  = import.meta.env.VITE_XWEATHER_CLIENT_SECRET as string
+import { base44 } from './base44'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -25,16 +24,13 @@ export interface XWStormCell {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function xwFetch(path: string): Promise<any> {
-  const sep = path.includes('?') ? '&' : '?'
-  const res = await fetch(`https://data.api.xweather.com${path}${sep}client_id=${XW_CID}&client_secret=${XW_CS}`)
-  if (!res.ok) throw new Error(`XWeather ${res.status}: ${path}`)
-  return res.json()
+  const res = await base44.functions.invoke('xweather-proxy', { path }) as any
+  return res?.data ?? res
 }
 
 // ── Storm Reports (confirmed hail) ────────────────────────────────────────────
 
 export async function fetchHailReports(rangeDays: number, minSizeIN = 0.75): Promise<XWHailReport[]> {
-  // XWeather relative time syntax: -Ndays = N days ago
   const from = `-${rangeDays}days`
   const data = await xwFetch(
     `/stormreports/search?query=type:HAIL,report.detail.hailIN:${minSizeIN}&from=${from}&to=now&limit=500`
@@ -72,7 +68,6 @@ export async function fetchStormCells(minProbSevere = 10): Promise<XWStormCell[]
     lon:        c.loc?.long ?? 0,
     maxSizeIN:  c.ob?.hail?.maxSizeIN ?? 0,
     probSevere: c.ob?.hail?.probSevere ?? 0,
-    // Forecast cone — narrow 5-degree corridor polygon
     cone:       c.forecast?.cone?.narrow?.coordinates?.[0] ?? undefined,
   }))
 }

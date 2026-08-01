@@ -43,16 +43,49 @@
       "type": "string",
       "description": "Year the building was constructed"
     },
+    "dm_property_id": {
+      "type": "string",
+      "description": "DealMachine property ID for this address"
+    },
+    "square_footage": {
+      "type": "number",
+      "description": "Building square footage from DealMachine"
+    },
+    "roof_age": {
+      "type": "number",
+      "description": "Roof age in years from DealMachine"
+    },
+    "roof_material": {
+      "type": "string",
+      "description": "Roof material from DealMachine"
+    },
+    "estimated_value": {
+      "type": "number",
+      "description": "Estimated property value from DealMachine"
+    },
+    "equity_percent": {
+      "type": "number",
+      "description": "Owner equity percentage from DealMachine"
+    },
     "contacts": {
       "type": "array",
-      "description": "Owner/contact records from Reonomy — up to 3 per property",
+      "description": "Owner/contact records from DealMachine",
       "items": {
         "type": "object",
         "properties": {
           "name":    { "type": "string" },
           "company": { "type": "string" },
           "title":   { "type": "string" },
-          "phones":  { "type": "array", "items": { "type": "string" } },
+          "phones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": { "type": "string" },
+                "type":   { "type": "string" }
+              }
+            }
+          },
           "emails":  { "type": "array", "items": { "type": "string" } }
         }
       }

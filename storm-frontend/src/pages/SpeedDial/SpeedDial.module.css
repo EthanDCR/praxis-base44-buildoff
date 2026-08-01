@@ -553,8 +553,8 @@
 .propDataSection::-webkit-scrollbar { display: none; }
 
 .propDataGrid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   padding: 8px 0 12px;
 }
 
@@ -567,7 +567,15 @@
   border-bottom: 1px solid var(--surface-border);
 }
 
-.propDataRow:last-child { border-bottom: none; }
+.propDataGrid > *:nth-child(odd):not(.propDataRowFull) {
+  border-right: 1px solid var(--surface-border);
+}
+
+.propDataRowFull {
+  grid-column: 1 / -1;
+}
+
+.propDataGrid > .propDataRow:last-of-type { border-bottom: none; }
 
 .propDataKey {
   font-size: 0.6875rem;
@@ -718,6 +726,19 @@
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
+}
+
+.phoneTypeBadge {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
 }
 
 .phoneRowActive {
@@ -988,6 +1009,7 @@
   background: var(--surface);
   overflow: hidden;
 }
+
 
 .panelLabel {
   font-size: 0.625rem;
