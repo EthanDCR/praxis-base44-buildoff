@@ -135,12 +135,22 @@ export default function SpeedDial() {
   const [activeId, setActiveId]         = useState<string | null>(null)
   const [filter, setFilter]             = useState<Filter>('all')
 
-  // Derive targets for the selected list, excluding sold
+  // Derive targets for the selected list, excluding sold.
+  // Normalize contacts.phones — old targets stored phones as plain strings;
+  // new targets store them as {number, type} objects.
   const targets = useMemo((): Target[] => {
     const byList = activeListId
-      ? (storeTargets as Target[]).filter(t => t.list_id === activeListId)
-      : (storeTargets as Target[])
-    return byList.filter(t => t.status !== 'sold')
+      ? (storeTargets as any[]).filter(t => t.list_id === activeListId)
+      : (storeTargets as any[])
+    return byList.filter(t => t.status !== 'sold').map(t => ({
+      ...t,
+      contacts: (t.contacts ?? []).map((c: any) => ({
+        ...c,
+        phones: (c.phones ?? []).map((p: any) =>
+          typeof p === 'string' ? { number: p, type: null } : p
+        ),
+      })),
+    }))
   }, [storeTargets, activeListId])
   const [saving, setSaving]             = useState(false)
   const [showListDrop, setShowListDrop]     = useState(false)

@@ -358,7 +358,8 @@ export default function HailMap() {
       const fullAddress = [selectedAddress.line1, selectedAddress.line2].filter(Boolean).join(', ')
       let enrichment: Record<string, any> = {}
       try {
-        const dm = await base44.functions.invoke('dm-enrich', { address: fullAddress }) as any
+        const res = await base44.functions.invoke('dm-enrich', { address: fullAddress }) as any
+        const dm = res?.data ?? res
         if (dm?.matched) {
           const { matched: _m, ...fields } = dm
           enrichment = Object.fromEntries(Object.entries(fields).filter(([, v]) => v != null))
