@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { Device, Call } from '@twilio/voice-sdk'
 import { base44 } from '../../lib/base44'
 import { useDataStore } from '../../lib/data-store'
+import { useUser } from '../../lib/user-context'
 import styles from './SpeedDial.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -130,12 +131,15 @@ export default function SpeedDial() {
   const location = useLocation()
   const navState = (location.state ?? {}) as { targetId?: string; listId?: string }
 
+  const user = useUser()
   const { lists, targets: storeTargets, loading: loadingTargets, updateTarget, refresh } = useDataStore()
 
   useEffect(() => { refresh() }, [])
   const [activeListId, setActiveListId] = useState<string | null>(null)
   const [activeId, setActiveId]         = useState<string | null>(null)
   const [filter, setFilter]             = useState<Filter>('all')
+
+  const isRepMode = !!user && user.role !== 'admin'
 
   // Derive targets for the selected list, excluding sold.
   // Normalize contacts.phones — old targets stored phones as plain strings;
@@ -144,16 +148,22 @@ export default function SpeedDial() {
     const byList = activeListId
       ? (storeTargets as any[]).filter(t => t.list_id === activeListId)
       : (storeTargets as any[])
-    return byList.filter(t => t.status !== 'sold').map(t => ({
-      ...t,
-      contacts: (t.contacts ?? []).map((c: any) => ({
-        ...c,
-        phones: (c.phones ?? []).map((p: any) =>
-          typeof p === 'string' ? { number: p, type: null } : p
-        ),
-      })),
-    }))
-  }, [storeTargets, activeListId])
+    const byAssignment = !isRepMode
+      ? byList
+      : byList.filter(t => t.assigned_to === user!.email)
+    return byAssignment
+      .filter(t => t.status !== 'sold')
+      .sort((a: any, b: any) => (b.created_date ?? '').localeCompare(a.created_date ?? ''))
+      .map(t => ({
+        ...t,
+        contacts: (t.contacts ?? []).map((c: any) => ({
+          ...c,
+          phones: (c.phones ?? []).map((p: any) =>
+            typeof p === 'string' ? { number: p, type: null } : p
+          ),
+        })),
+      }))
+  }, [storeTargets, activeListId, user, isRepMode])
   const [saving, setSaving]             = useState(false)
   const [showListDrop, setShowListDrop]     = useState(false)
   const [showFilterDrop, setShowFilterDrop] = useState(false)
@@ -737,6 +747,20 @@ export default function SpeedDial() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1, duration: 0.6, ease: EASE }}
         >
+          {isRepMode && !loadingTargets && (
+            <div className={styles.repQueue}>
+              {stats.callback > 0 && (
+                <span className={styles.repQueueCallback}>
+                  {stats.callback} callback{stats.callback !== 1 ? 's' : ''}
+                </span>
+              )}
+              <span className={styles.repQueueNew}>{stats.new} new</span>
+              <span className={styles.repQueueSep}>·</span>
+              <span className={styles.repQueueWorked}>{stats.called + stats.not_interested} worked</span>
+              <span className={styles.repQueueSep}>·</span>
+              <span className={styles.repQueueTotal}>{targets.length} total</span>
+            </div>
+          )}
           <div className={styles.filterWrap} ref={filterDropRef}>
             <button
               className={styles.filterTrigger}
@@ -821,7 +845,10 @@ export default function SpeedDial() {
               ) : !activeTarget ? (
                 <motion.div key="done" className={styles.emptyState}
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  All targets worked for today
+                  {targets.length === 0
+                    ? isRepMode ? 'No targets assigned to you yet — check with your manager' : 'No targets in this list'
+                    : 'All done — no targets left to work'
+                  }
                 </motion.div>
               ) : (
                 <motion.div

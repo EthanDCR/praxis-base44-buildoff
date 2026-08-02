@@ -9,6 +9,7 @@ import SpeedDial from './pages/SpeedDial/SpeedDial'
 import Leads from './pages/Leads/Leads'
 import Overwatch from './pages/Overwatch/Overwatch'
 import Admin from './pages/Admin/Admin'
+import BulkTargets from './pages/BulkTargets/BulkTargets'
 import Login from './pages/Login/Login'
 import { base44 } from './lib/base44'
 import { UserProvider, type AppUser } from './lib/user-context'
@@ -94,6 +95,7 @@ export default function App() {
                   <Route path="/leads" element={<Leads />} />
                   <Route path="/overwatch" element={<Overwatch />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/bulk-targets" element={<BulkTargets />} />
                 </Routes>
               </BrowserRouter>
             </motion.div>

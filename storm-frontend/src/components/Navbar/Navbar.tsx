@@ -44,10 +44,13 @@ export default function Navbar() {
 
       <ul className={styles.links}>
         {[
-          { to: '/',           label: 'Storm Map' },
-          { to: '/speed-dial', label: 'Targets'   },
-          { to: '/leads',      label: 'Leads'     },
-          { to: '/overwatch',  label: 'Overwatch' },
+          { to: '/',               label: 'Storm Map'     },
+          { to: '/speed-dial',     label: 'Targets'       },
+          { to: '/leads',          label: 'Leads'         },
+          { to: '/overwatch',      label: 'Overwatch'     },
+          ...(user?.role === 'admin'
+            ? [{ to: '/bulk-targets', label: 'Bulk Targets' }]
+            : []),
         ].map(({ to, label }) => (
           <li key={to}>
             <NavLink

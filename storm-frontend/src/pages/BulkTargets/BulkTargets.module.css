@@ -1,0 +1,287 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--nav-height));
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.accessMsg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - var(--nav-height));
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* ── Top bar ─────────────────────────────────────────── */
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 24px;
+  height: 52px;
+  border-bottom: 1px solid var(--surface-border);
+  flex-shrink: 0;
+}
+
+.pageTitle {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.totalCount {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* ── Filter bar ──────────────────────────────────────── */
+
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--surface-border);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  max-width: 280px;
+  padding: 7px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--surface-border);
+  border-radius: 3px;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.searchInput::placeholder { color: var(--text-muted); }
+.searchInput:focus { border-color: var(--surface-border-strong); background: rgba(255,255,255,0.06); }
+
+.filterSelect {
+  padding: 7px 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  color-scheme: dark;
+}
+
+.filterSelect:focus { border-color: var(--surface-border-strong); background: var(--surface-raised); }
+
+/* ── Table ───────────────────────────────────────────── */
+
+.tableWrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.tableWrap::-webkit-scrollbar { width: 4px; height: 4px; }
+.tableWrap::-webkit-scrollbar-track { background: transparent; }
+.tableWrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+}
+
+.thCheck, .th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--surface-border);
+  white-space: nowrap;
+}
+
+.thCheck {
+  width: 44px;
+  padding-left: 20px;
+}
+
+.checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: rgba(255,255,255,0.7);
+  cursor: pointer;
+}
+
+.row {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.row:hover { background: rgba(255,255,255,0.03); }
+
+.rowSelected { background: rgba(255,255,255,0.06); }
+.rowSelected:hover { background: rgba(255,255,255,0.08); }
+
+.tdCheck {
+  padding: 10px 14px 10px 20px;
+  width: 44px;
+}
+
+.td {
+  padding: 10px 14px;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.addrLine1 {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.addrLine2 {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.listTag {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Status pills */
+.statusPill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-muted);
+}
+
+.status_new { background: rgba(59,130,246,0.15); color: #93c5fd; }
+.status_callback { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.status_called { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+.status_not_interested { background: rgba(239,68,68,0.1); color: #f87171; }
+.status_sold { background: rgba(52,211,153,0.15); color: #34d399; }
+.status_overwatch { background: rgba(168,85,247,0.15); color: #c084fc; }
+.status_crm_sent { background: rgba(52,211,153,0.1); color: #6ee7b7; }
+
+.hailInfo {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.hailDate {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.assignedTo {
+  font-size: 0.8rem;
+  color: rgba(52,211,153,0.8);
+}
+
+.dash { color: var(--text-muted); opacity: 0.4; }
+
+/* ── Action bar ──────────────────────────────────────── */
+
+.actionBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: rgba(20,20,28,0.97);
+  border-top: 1px solid var(--surface-border);
+  flex-shrink: 0;
+}
+
+.selectedCount {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-right: 4px;
+}
+
+.repSelect {
+  padding: 7px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--surface-border);
+  border-radius: 3px;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  min-width: 180px;
+  color-scheme: dark;
+}
+
+.assignBtn {
+  padding: 8px 20px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 3px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.assignBtn:hover:not(:disabled) { background: rgba(255,255,255,0.16); }
+.assignBtn:disabled { opacity: 0.4; cursor: default; }
+
+.clearBtn {
+  padding: 8px 14px;
+  background: none;
+  border: 1px solid var(--surface-border);
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.clearBtn:hover:not(:disabled) { color: var(--text-primary); border-color: var(--surface-border-strong); }
+.clearBtn:disabled { opacity: 0.4; cursor: default; }
+
+.assignError {
+  font-size: 0.75rem;
+  color: #f87171;
+  margin-left: 4px;
+}

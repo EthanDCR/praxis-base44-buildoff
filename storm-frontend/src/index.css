@@ -1,3 +1,7 @@
+:root, select, option {
+  color-scheme: dark;
+}
+
 :root {
   /* Palette */
   --red-900:  #800016;

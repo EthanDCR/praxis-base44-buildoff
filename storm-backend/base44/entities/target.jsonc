@@ -108,6 +108,10 @@
     "notes": {
       "type": "string",
       "description": "Notes from the call"
+    },
+    "assigned_to": {
+      "type": "string",
+      "description": "Email of the rep this target is assigned to"
     }
   },
   "required": ["list_id", "line1"],
