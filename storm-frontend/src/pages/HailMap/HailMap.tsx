@@ -88,7 +88,7 @@ export default function HailMap() {
   const [xwReports, setXwReports] = useState<XWHailReport[]>([])
   useEffect(() => {
     fetchHailReports(rangeDays, minSize)
-      .then(r => { console.log('[XWeather] loaded', r.length, 'reports'); setXwReports(r) })
+      .then(r => setXwReports(r))
       .catch(e => console.error('[XWeather] fetch error', e))
   }, [rangeDays, minSize])
 
@@ -106,20 +106,14 @@ export default function HailMap() {
   // ── GeoJSON memos ────────────────────────────────────────
   const mrmsGeoJSON = useMemo(() => {
     const cutoff = new Date(Date.now() - rangeDays * 86400000)
-    let skippedSize = 0, skippedDate = 0, skippedParse = 0
     const features = mrmsFeatures.flatMap(f => {
-      if ((f.min_size_inches ?? 0) < minSize) { skippedSize++; return [] }
-      if (f.event_date && new Date(f.event_date) < cutoff) { skippedDate++; return [] }
+      if ((f.min_size_inches ?? 0) < minSize) return []
+      if (f.event_date && new Date(f.event_date) < cutoff) return []
       try {
         const geom = typeof f.geometry === 'string' ? JSON.parse(f.geometry) : f.geometry
-        return [{
-          type: 'Feature' as const,
-          geometry: geom,
-          properties: { min_size_inches: f.min_size_inches ?? 0, event_date: f.event_date ?? '' },
-        }]
-      } catch { skippedParse++; return [] }
+        return [{ type: 'Feature' as const, geometry: geom, properties: { min_size_inches: f.min_size_inches ?? 0, event_date: f.event_date ?? '' } }]
+      } catch { return [] }
     })
-    console.log(`[mrmsGeoJSON] ${features.length} features (skipped: size=${skippedSize} date=${skippedDate} parse=${skippedParse})`)
     return { type: 'FeatureCollection' as const, features }
   }, [mrmsFeatures, minSize, rangeDays])
 
@@ -223,28 +217,21 @@ export default function HailMap() {
       map.getCanvas().style.cursor = ''
     })
 
-    // Click → reverse geocode (Google snaps to nearest address)
+    // Click → reverse geocode
     map.on('click', async (e: any) => {
       const { lng, lat } = e.lngLat
       try {
         const res  = await fetch(
-          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_PLACES_KEY}`
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en' } }
         )
         const data = await res.json()
-        const result = data.results?.[0]
-        if (!result) return
-        const comps: any[] = result.address_components ?? []
-        const get = (...types: string[]) =>
-          comps.find((c: any) => types.every(t => c.types.includes(t)))?.long_name ?? ''
-        const streetNumber = get('street_number')
-        const route        = get('route')
-        const city         = get('locality') || get('sublocality') || get('administrative_area_level_3')
-        const state        = get('administrative_area_level_1')
-        const zip          = get('postal_code')
-        const line1 = [streetNumber, route].filter(Boolean).join(' ') || result.formatted_address.split(',')[0]
-        const line2 = [city, state].filter(Boolean).join(', ')
-        setSelectedAddress({ display: result.formatted_address, line1, line2, zip, lat, lng })
-      } catch {}
+        const a    = data.address ?? {}
+        const line1 = [a.house_number, a.road].filter(Boolean).join(' ') || data.display_name?.split(',')[0]
+        const line2 = [a.city || a.town || a.village, a.state].filter(Boolean).join(', ')
+        const zip   = a.postcode ?? ''
+        setSelectedAddress({ display: data.display_name, line1, line2, zip, lat, lng })
+      } catch (e) { console.error('[map click]', e) }
     })
 
     mapRef.current = map
@@ -259,13 +246,11 @@ export default function HailMap() {
   // ── Sync GeoJSON sources when data changes ───────────────
   useEffect(() => {
     const src = mapRef.current?.getSource('mrms') as maplibregl.GeoJSONSource | undefined
-    console.log('[mrms setData] source found:', !!src, 'features:', mrmsGeoJSON.features.length, 'mapLoaded:', mapLoaded)
     src?.setData(mrmsGeoJSON as any)
   }, [mrmsGeoJSON, mapLoaded])
 
   useEffect(() => {
     const src = mapRef.current?.getSource('xw-reports') as maplibregl.GeoJSONSource | undefined
-    console.log('[xw setData] source found:', !!src, 'features:', xwReportsGeoJSON.features.length, 'mapLoaded:', mapLoaded)
     src?.setData(xwReportsGeoJSON as any)
   }, [xwReportsGeoJSON, mapLoaded])
 
