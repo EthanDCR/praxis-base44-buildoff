@@ -33,7 +33,6 @@ export default function Login({ onLogin }: LoginProps) {
       onLogin(user as unknown as AppUser)
     } catch (err: any) {
       const status = err?.response?.status ?? err?.status ?? err?.statusCode
-      const msg = (err?.response?.data?.message ?? err?.response?.data?.detail ?? '').toLowerCase()
       if (status === 403) {
         setStep('otp')
       } else {
