@@ -58,16 +58,21 @@ export default function App() {
   async function onSplashDone() {
     if (import.meta.env.DEV) { setPhase('app'); return }
     try {
-      const me = await base44.auth.me() as AppUser
-      setUser(await resolveUser(me))
-      setPhase('app')
-    } catch {
-      setPhase('login')
-    }
+      const stored = localStorage.getItem('praxis_session')
+      if (stored) {
+        const parsed = JSON.parse(stored) as AppUser
+        setUser(await resolveUser(parsed))
+        setPhase('app')
+        return
+      }
+    } catch {}
+    setPhase('login')
   }
 
   async function onLogin(user: AppUser) {
-    setUser(await resolveUser(user))
+    const resolved = await resolveUser(user)
+    localStorage.setItem('praxis_session', JSON.stringify(resolved))
+    setUser(resolved)
     setPhase('app')
   }
 
