@@ -46,19 +46,28 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('splash')
   const [user, setUser] = useState<AppUser | null>(null)
 
+  async function resolveUser(me: AppUser): Promise<AppUser> {
+    try {
+      const profiles = await base44.entities.UserProfile.filter({ email: me.email }, undefined, 1) as any[]
+      const profile = profiles[0]
+      if (profile?.role) return { ...me, role: profile.role }
+    } catch {}
+    return me
+  }
+
   async function onSplashDone() {
     if (import.meta.env.DEV) { setPhase('app'); return }
     try {
-      const me = await base44.auth.me()
-      setUser(me as AppUser)
+      const me = await base44.auth.me() as AppUser
+      setUser(await resolveUser(me))
       setPhase('app')
     } catch {
       setPhase('login')
     }
   }
 
-  function onLogin(user: AppUser) {
-    setUser(user)
+  async function onLogin(user: AppUser) {
+    setUser(await resolveUser(user))
     setPhase('app')
   }
 

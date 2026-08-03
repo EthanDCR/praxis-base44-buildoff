@@ -186,6 +186,21 @@ export default function SpeedDial() {
   const [hailData, setHailData]       = useState<HailEvent[] | null>(null)
   const [hailLoading, setHailLoading] = useState(false)
 
+  // Rep's assigned Twilio profile
+  const [repTwilioIdentity, setRepTwilioIdentity] = useState<string | null>(null)
+  const [repTwilioNumber, setRepTwilioNumber]     = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user?.email) return
+    base44.entities.UserProfile.filter({ email: user.email }, undefined, 1)
+      .then((d: any) => {
+        const p = d[0]
+        if (p?.twilio_identity) setRepTwilioIdentity(p.twilio_identity)
+        if (p?.twilio_number)   setRepTwilioNumber(p.twilio_number)
+      })
+      .catch(console.error)
+  }, [user?.email])
+
   // Dialer
   const [twilioReady, setTwilioReady]     = useState(false)
   const [dialerPhone, setDialerPhone]     = useState<string | null>(null)
@@ -235,9 +250,15 @@ export default function SpeedDial() {
     })
   }, [targets])
 
-  // Initialize Twilio Device
+  // Initialize Twilio Device — wait until we know the rep's identity
   useEffect(() => {
-    const tokenUrl = import.meta.env.VITE_TWILIO_TOKEN_URL || '/twilio-token'
+    // Only set up once we have a user; for reps, wait for their profile to load
+    if (!user) return
+    if (isRepMode && !repTwilioIdentity) return
+
+    const baseUrl = import.meta.env.VITE_TWILIO_TOKEN_URL || '/twilio-token'
+    const identity = repTwilioIdentity ?? user.email.replace(/[^a-zA-Z0-9_-]/g, '_')
+    const tokenUrl = `${baseUrl}?identity=${encodeURIComponent(identity)}`
 
     let device: Device
 
@@ -269,7 +290,7 @@ export default function SpeedDial() {
 
     setup()
     return () => { device?.destroy() }
-  }, [])
+  }, [user, isRepMode, repTwilioIdentity])
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -1132,6 +1153,11 @@ export default function SpeedDial() {
                 <span className={twilioReady ? styles.twilioStatusOk : styles.twilioStatus}>
                   {twilioReady ? 'Twilio — connected' : 'Twilio — not connected'}
                 </span>
+                {repTwilioNumber && (
+                  <span className={styles.twilioStatus} style={{ marginLeft: 8 }}>
+                    calling from {repTwilioNumber}
+                  </span>
+                )}
               </div>
             </div>
 

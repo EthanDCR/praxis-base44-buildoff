@@ -177,8 +177,14 @@ function NewUserForm({
     setError('')
     setSuccess('')
     try {
-      // 1. Create Base44 account (full_name set via UserProfile entity)
-      await base44.auth.register({ email, password })
+      // 1. Create Base44 account
+      let accountAlreadyExisted = false
+      try {
+        await base44.auth.register({ email, password })
+      } catch {
+        accountAlreadyExisted = true
+        // proceed — just create the profile for an existing account
+      }
 
       // 2. Save UserProfile entity
       const profile = await base44.entities.UserProfile.create({
@@ -190,10 +196,13 @@ function NewUserForm({
         active: true,
       })
 
-      setSuccess(`Account created. Send ${fullName || email} their credentials to log in.`)
+      const msg = accountAlreadyExisted
+        ? `Profile created. Note: ${fullName || email} already had an account — they must use their existing password to log in (the one you entered here was not applied).`
+        : `Account created. Send ${fullName || email} their credentials to log in.`
+      setSuccess(msg)
       onCreated(profile as UserProfile)
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to create account. Email may already be in use.')
+      setError(err?.response?.data?.message ?? 'Failed to create account.')
     } finally {
       setLoading(false)
     }

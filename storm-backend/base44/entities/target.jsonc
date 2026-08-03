@@ -31,6 +31,11 @@
       "format": "date-time",
       "description": "Date of the hail event"
     },
+    "additional_storm_dates": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Additional storm event dates at this location"
+    },
     "property_type": {
       "type": "string",
       "description": "Property type from Reonomy (e.g. Retail, Industrial, Multifamily)"

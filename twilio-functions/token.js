@@ -8,6 +8,9 @@ exports.handler = function (context, event, callback) {
   const AccessToken = Twilio.jwt.AccessToken
   const VoiceGrant  = AccessToken.VoiceGrant
 
+  // identity is passed from the frontend — must match what incoming-call.js dials
+  const identity = (event.identity || '').trim() || 'agent'
+
   const voiceGrant = new VoiceGrant({
     outgoingApplicationSid: context.TWIML_APP_SID,
     incomingAllow: true,
@@ -17,7 +20,7 @@ exports.handler = function (context, event, callback) {
     context.ACCOUNT_SID,   // auto-set by Twilio Functions
     context.API_KEY,
     context.API_SECRET,
-    { identity: 'agent', ttl: 3600 }
+    { identity, ttl: 3600 }
   )
   token.addGrant(voiceGrant)
 
