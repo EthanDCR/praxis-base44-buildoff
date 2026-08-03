@@ -34,10 +34,7 @@ export default function Login({ onLogin }: LoginProps) {
     } catch (err: any) {
       const status = err?.response?.status ?? err?.status ?? err?.statusCode
       const msg = (err?.response?.data?.message ?? err?.response?.data?.detail ?? '').toLowerCase()
-      const isWrongPassword = msg.includes('invalid') || msg.includes('incorrect') || msg.includes('wrong') || msg.includes('not found')
-      if ((status === 400 || status === 403) && !isWrongPassword) {
-        // Account exists but email not verified — send a fresh code so it's never stale
-        try { await base44.auth.resendOtp(email) } catch {}
+      if (status === 403) {
         setStep('otp')
       } else {
         triggerShake('Invalid email or password.')
