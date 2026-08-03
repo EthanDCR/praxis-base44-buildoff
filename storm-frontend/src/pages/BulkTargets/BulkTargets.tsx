@@ -28,7 +28,10 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function BulkTargets() {
   const currentUser = useUser()
-  const { lists, targets: storeTargets, loading: loadingTargets, refresh } = useDataStore()
+  const { lists, targets: storeTargets, loading: loadingTargets, allTargetsLoaded, refresh } = useDataStore()
+
+  const PAGE_SIZE = 200
+  const [page, setPage] = useState(0)
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [profiles, setProfiles] = useState<RepProfile[]>([])
@@ -43,6 +46,9 @@ export default function BulkTargets() {
   const [assigning, setAssigning] = useState(false)
   const [assignProgress, setAssignProgress] = useState<{ done: number; total: number } | null>(null)
   const [assignError, setAssignError] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteProgress, setDeleteProgress] = useState<{ done: number; total: number } | null>(null)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     if (!currentUser?.email) return
@@ -89,6 +95,12 @@ export default function BulkTargets() {
     return targets
   }, [storeTargets, search, statusFilter, listFilter, assignedFilter])
 
+  // Reset to first page whenever filters change
+  useEffect(() => { setPage(0) }, [search, statusFilter, listFilter, assignedFilter])
+
+  const pageCount = Math.max(1, Math.ceil(filteredTargets.length / PAGE_SIZE))
+  const visibleTargets = filteredTargets.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
   const allSelected = filteredTargets.length > 0 && filteredTargets.every(t => selected.has(t.id))
 
   function toggleAll() {
@@ -106,6 +118,38 @@ export default function BulkTargets() {
       else next.add(id)
       return next
     })
+  }
+
+  async function handleDelete() {
+    if (selected.size === 0 || deleting) return
+    if (!confirm(`Permanently delete ${selected.size.toLocaleString()} target${selected.size === 1 ? '' : 's'}? This cannot be undone.`)) return
+    setDeleting(true)
+    setDeleteError('')
+    const ids = [...selected]
+    setDeleteProgress({ done: 0, total: ids.length })
+
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        let retries = 0
+        while (true) {
+          try {
+            await base44.entities.Target.delete(ids[i])
+            break
+          } catch (e: any) {
+            if (retries++ >= 4) throw e
+            await new Promise(r => setTimeout(r, 1500 * retries))
+          }
+        }
+        setDeleteProgress({ done: i + 1, total: ids.length })
+      }
+      setSelected(new Set())
+      await refresh()
+    } catch {
+      setDeleteError('Failed partway through. Some targets may not have been deleted.')
+    } finally {
+      setDeleting(false)
+      setDeleteProgress(null)
+    }
   }
 
   async function handleAssign() {
@@ -167,6 +211,9 @@ export default function BulkTargets() {
         <span className={styles.pageTitle}>BULK TARGETS</span>
         <span className={styles.totalCount}>
           {filteredTargets.length.toLocaleString()} targets
+          {!allTargetsLoaded && (
+            <span className={styles.loadingBadge}> · loading…</span>
+          )}
         </span>
       </motion.div>
 
@@ -242,7 +289,7 @@ export default function BulkTargets() {
               </tr>
             </thead>
             <tbody>
-              {filteredTargets.map((t: any) => (
+              {visibleTargets.map((t: any) => (
                 <tr
                   key={t.id}
                   className={`${styles.row} ${selected.has(t.id) ? styles.rowSelected : ''}`}
@@ -293,6 +340,25 @@ export default function BulkTargets() {
         )}
       </div>
 
+      {pageCount > 1 && (
+        <div className={styles.pagination}>
+          <button
+            className={styles.pageBtn}
+            disabled={page === 0}
+            onClick={() => setPage(p => p - 1)}
+          >← Prev</button>
+          <span className={styles.pageLabel}>
+            {page + 1} / {pageCount}
+            <span className={styles.pageSubLabel}> ({filteredTargets.length.toLocaleString()} total)</span>
+          </span>
+          <button
+            className={styles.pageBtn}
+            disabled={page >= pageCount - 1}
+            onClick={() => setPage(p => p + 1)}
+          >Next →</button>
+        </div>
+      )}
+
       {selected.size > 0 && (
         <motion.div
           className={styles.actionBar}
@@ -307,7 +373,7 @@ export default function BulkTargets() {
             className={styles.repSelect}
             value={selectedRep}
             onChange={e => setSelectedRep(e.target.value)}
-            disabled={assigning}
+            disabled={assigning || deleting}
           >
             <option value="">Assign to rep…</option>
             {reps.map(p => (
@@ -318,7 +384,7 @@ export default function BulkTargets() {
           </select>
           <button
             className={styles.assignBtn}
-            disabled={!selectedRep || assigning}
+            disabled={!selectedRep || assigning || deleting}
             onClick={handleAssign}
           >
             {assigning && assignProgress
@@ -329,12 +395,24 @@ export default function BulkTargets() {
           </button>
           <button
             className={styles.clearBtn}
-            disabled={assigning}
+            disabled={assigning || deleting}
             onClick={() => setSelected(new Set())}
           >
             Clear
           </button>
+          <button
+            className={styles.deleteBtn}
+            disabled={assigning || deleting}
+            onClick={handleDelete}
+          >
+            {deleting && deleteProgress
+              ? `Deleting ${deleteProgress.done}/${deleteProgress.total}…`
+              : deleting
+              ? 'Deleting…'
+              : 'Delete Selected'}
+          </button>
           {assignError && <span className={styles.assignError}>{assignError}</span>}
+          {deleteError && <span className={styles.assignError}>{deleteError}</span>}
         </motion.div>
       )}
     </div>

@@ -285,3 +285,63 @@
   color: #f87171;
   margin-left: 4px;
 }
+
+.deleteBtn {
+  padding: 8px 16px;
+  background: none;
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 3px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgba(239,68,68,0.7);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.deleteBtn:hover:not(:disabled) { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.55); color: #f87171; }
+.deleteBtn:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Loading badge ───────────────────────────────────── */
+
+.loadingBadge {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* ── Pagination ──────────────────────────────────────── */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--surface-border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.pageBtn {
+  padding: 6px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--surface-border);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pageBtn:hover:not(:disabled) { background: var(--surface-border); }
+.pageBtn:disabled { opacity: 0.35; cursor: default; }
+
+.pageLabel {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+
+.pageSubLabel {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
