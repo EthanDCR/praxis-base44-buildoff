@@ -69,7 +69,7 @@ export default function Login({ onLogin }: LoginProps) {
     setError('')
     try {
       await base44.auth.verifyOtp({ email, otpCode: otp })
-      const user = await base44.auth.loginViaEmailPassword(email, password)
+      const user = await base44.auth.me()
       onLogin(user as unknown as AppUser)
     } catch {
       triggerShake('Invalid or expired code.')
