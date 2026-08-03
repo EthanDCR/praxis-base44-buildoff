@@ -6,11 +6,16 @@ import styles from './Overwatch.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
+interface Phone {
+  number: string
+  type?: string | null
+}
+
 interface Contact {
   name: string
   title?: string
   company?: string
-  phones: string[]
+  phones: Phone[]
   emails: string[]
 }
 
@@ -105,7 +110,7 @@ export default function Overwatch() {
             >
               {targets.map((t, i) => {
                 const c     = t.contacts?.[0]
-                const phone = c?.phones?.[0]
+                const phone = c?.phones?.[0]?.number
                 return (
                   <motion.div
                     key={t.id}

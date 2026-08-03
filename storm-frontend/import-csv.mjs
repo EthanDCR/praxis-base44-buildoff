@@ -152,11 +152,14 @@ async function createWithRetry(fn) {
       if (currentDelay > 300) currentDelay = Math.max(300, currentDelay - 20)
       return result
     } catch (e) {
-      const isRL = e.message?.includes('429') || e.message?.includes('Rate limit')
-      if (!isRL || retries++ >= 6) throw e
+      const msg = e.message ?? ''
+      const isTransient = msg.includes('429') || msg.includes('Rate limit') ||
+                          msg.includes('502') || msg.includes('503') ||
+                          msg.includes('ECONNRESET') || msg.includes('ETIMEDOUT')
+      if (!isTransient || retries++ >= 8) throw e
       currentDelay = Math.min(currentDelay * 1.5, 3000)
       const wait = 10000 * retries
-      process.stdout.write(`\r  [429] waiting ${wait / 1000}s (delay → ${currentDelay.toFixed(0)}ms)...    `)
+      process.stdout.write(`\r  [${msg.includes('429') ? '429' : 'err'}] waiting ${wait / 1000}s (delay → ${currentDelay.toFixed(0)}ms)...    `)
       await delay(wait)
     }
   }
@@ -190,25 +193,21 @@ for (const file of csvFiles) {
   console.log(`\n── ${file} (${rows.length} rows) → list: "${listName}"`)
 
   let listId = existingByName.get(listName)
+  let resumeOffset = 0
   if (listId) {
-    console.log(`  Found existing list (id: ${listId}) — clearing any partial targets...`)
-    let skip = 0
-    const toDel = []
+    // Count how many targets already exist so we can resume from that row
+    let countSkip = 0, existingCount = 0
     while (true) {
-      const page = await app.entities.Target.filter({ list_id: listId }, undefined, 500, skip)
-      toDel.push(...page)
+      const page = await app.entities.Target.filter({ list_id: listId }, undefined, 500, countSkip)
+      existingCount += page.length
       if (page.length < 500) break
-      skip += 500
+      countSkip += 500
     }
-    if (toDel.length > 0) {
-      process.stdout.write(`  Deleting ${toDel.length} existing targets...`)
-      for (const t of toDel) {
-        await createWithRetry(() => app.entities.Target.delete(t.id))
-        await delay(150)
-      }
-      console.log(' done.')
+    if (existingCount > 0) {
+      console.log(`  Resuming from row ${existingCount} (${existingCount} already imported)`)
+      resumeOffset = existingCount
     } else {
-      console.log('  No existing targets to clear.')
+      console.log(`  Existing list is empty, importing fresh`)
     }
   } else {
     const list = await createWithRetry(() =>
@@ -218,8 +217,10 @@ for (const file of csvFiles) {
     await delay(200)
   }
 
-  let imported = 0
-  for (const row of rows) {
+  const rowsToImport = rows.slice(resumeOffset)
+  if (resumeOffset > 0) console.log(`  Skipping ${resumeOffset} already-imported rows`)
+  let imported = resumeOffset
+  for (const row of rowsToImport) {
     const city  = row['City']?.trim()  ?? ''
     const state = row['State']?.trim() ?? ''
     const zip   = row['Zip']?.trim()   ?? ''
@@ -268,6 +269,7 @@ for (const file of csvFiles) {
     if (imported % 100 === 0) {
       process.stdout.write(`\r  ${imported}/${rows.length} (${((imported / rows.length) * 100).toFixed(1)}%) — delay: ${currentDelay.toFixed(0)}ms      `)
     }
+
     await delay(currentDelay)
   }
 
