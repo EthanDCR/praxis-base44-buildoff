@@ -34,12 +34,10 @@ export default function Login({ onLogin }: LoginProps) {
     } catch (err: any) {
       const status = err?.response?.status ?? err?.status ?? err?.statusCode
       const msg = (err?.response?.data?.message ?? err?.response?.data?.detail ?? '').toLowerCase()
-      const needsOtp = (status === 400 || status === 403)
-        && !msg.includes('already verified')
-        && !msg.includes('invalid')
-        && !msg.includes('incorrect')
-        && !msg.includes('wrong')
-      if (needsOtp) {
+      const isWrongPassword = msg.includes('invalid') || msg.includes('incorrect') || msg.includes('wrong') || msg.includes('not found')
+      if ((status === 400 || status === 403) && !isWrongPassword) {
+        // Account exists but email not verified — send a fresh code so it's never stale
+        try { await base44.auth.resendOtp(email) } catch {}
         setStep('otp')
       } else {
         triggerShake('Invalid email or password.')
@@ -68,11 +66,18 @@ export default function Login({ onLogin }: LoginProps) {
     setLoading(true)
     setError('')
     try {
-      await base44.auth.verifyOtp({ email, otpCode: otp })
-      const user = await base44.auth.me()
-      onLogin(user as unknown as AppUser)
+      await base44.auth.verifyOtp({ email, otpCode: otp.trim() })
     } catch {
       triggerShake('Invalid or expired code.')
+      setLoading(false)
+      return
+    }
+    try {
+      const user = await base44.auth.loginViaEmailPassword(email, password)
+      onLogin(user as unknown as AppUser)
+    } catch {
+      triggerShake('Code accepted — but login failed. Check your password.')
+      setStep('login')
     } finally {
       setLoading(false)
     }
