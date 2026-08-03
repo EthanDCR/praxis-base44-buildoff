@@ -180,6 +180,94 @@
 
 .filterSelect:focus { border-color: var(--surface-border-strong); background: var(--surface-raised); }
 
+.listSelect {
+  padding: 7px 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  color-scheme: dark;
+  min-width: 220px;
+}
+
+.listSelect:focus { border-color: var(--surface-border-strong); background: var(--surface-raised); }
+
+/* ── MultiSelect ─────────────────────────────────────────── */
+
+.multiSelectWrap {
+  position: relative;
+  width: 100%;
+}
+
+.multiSelectTrigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.multiSelectTrigger:hover { border-color: var(--surface-border-strong); color: var(--text-primary); }
+.multiSelectTriggerActive { color: var(--text-primary); border-color: var(--surface-border-strong); }
+
+.multiSelectLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.multiSelectDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: #1a1a26;
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  overflow-y: auto;
+  max-height: 220px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.multiSelectOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s;
+  user-select: none;
+}
+
+.multiSelectOption:hover { background: rgba(255,255,255,0.05); }
+
+.multiSelectCheckbox {
+  width: 13px;
+  height: 13px;
+  accent-color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 /* ── Table ───────────────────────────────────────────── */
 
 .tableWrap {

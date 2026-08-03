@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { base44 } from '../../lib/base44'
 import { useUser } from '../../lib/user-context'
@@ -7,8 +7,6 @@ import styles from './BulkTargets.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
-type AssignedFilter = 'all' | 'assigned' | 'unassigned'
-
 interface RepProfile {
   id: string
   email: string
@@ -16,20 +14,103 @@ interface RepProfile {
   role?: string
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  new: 'New',
-  called: 'Called',
-  callback: 'Callback',
-  not_interested: 'Not Interested',
-  sold: 'Inspection Set',
-  overwatch: 'Overwatch',
-  crm_sent: 'CRM Sent',
-}
+const STATUS_OPTIONS = [
+  { value: 'new', label: 'New' },
+  { value: 'called', label: 'Called' },
+  { value: 'callback', label: 'Callback' },
+  { value: 'not_interested', label: 'Not Interested' },
+  { value: 'sold', label: 'Inspection Set' },
+  { value: 'overwatch', label: 'Overwatch' },
+  { value: 'crm_sent', label: 'CRM Sent' },
+]
+
+const STATUS_LABEL: Record<string, string> = Object.fromEntries(
+  STATUS_OPTIONS.map(o => [o.value, o.label])
+)
 
 function extractState(line2: string): string {
   const m = /,\s*([A-Z]{2})\s+\d{5}/.exec(line2 ?? '')
   return m ? m[1] : ''
 }
+
+/* ── MultiSelect dropdown ──────────────────────────────────── */
+
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+}: {
+  options: { value: string; label: string }[]
+  selected: Set<string>
+  onChange: (next: Set<string>) => void
+  placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [])
+
+  function toggle(value: string) {
+    const next = new Set(selected)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    onChange(next)
+  }
+
+  const selectedLabels = options.filter(o => selected.has(o.value)).map(o => o.label)
+  const displayText =
+    selectedLabels.length === 0
+      ? placeholder
+      : selectedLabels.length <= 2
+      ? selectedLabels.join(', ')
+      : `${selectedLabels.slice(0, 2).join(', ')} +${selectedLabels.length - 2}`
+
+  return (
+    <div ref={ref} className={styles.multiSelectWrap}>
+      <button
+        type="button"
+        className={`${styles.multiSelectTrigger} ${selected.size > 0 ? styles.multiSelectTriggerActive : ''}`}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className={styles.multiSelectLabel}>{displayText}</span>
+        <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{ flexShrink: 0 }}>
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div className={styles.multiSelectDropdown}>
+          {options.map(o => (
+            <label key={o.value} className={styles.multiSelectOption}>
+              <input
+                type="checkbox"
+                className={styles.multiSelectCheckbox}
+                checked={selected.has(o.value)}
+                onChange={() => toggle(o.value)}
+              />
+              {o.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Main component ────────────────────────────────────────── */
 
 export default function BulkTargets() {
   const currentUser = useUser()
@@ -45,24 +126,25 @@ export default function BulkTargets() {
   const [search, setSearch] = useState('')
   const [contactSearch, setContactSearch] = useState('')
 
-  // ── Basic filters ──
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [listFilter, setListFilter] = useState<string | null>(null)
-  const [assignedFilter, setAssignedFilter] = useState<AssignedFilter>('all')
+  // ── Multi-select filters ──
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set())
+  const [repFilter, setRepFilter] = useState<Set<string>>(new Set())
+  const [stateFilter, setStateFilter] = useState<Set<string>>(new Set())
+  const [roofMaterialFilter, setRoofMaterialFilter] = useState<Set<string>>(new Set())
 
-  // ── Advanced filters ──
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const [stateFilter, setStateFilter] = useState('')
+  // ── Single-select / range filters ──
+  const [listFilter, setListFilter] = useState<string | null>(null)
   const [hasPhoneFilter, setHasPhoneFilter] = useState('all')
   const [hasEmailFilter, setHasEmailFilter] = useState('all')
   const [propertyTypeSearch, setPropertyTypeSearch] = useState('')
-  const [roofMaterialFilter, setRoofMaterialFilter] = useState('')
   const [sqftMin, setSqftMin] = useState('')
   const [sqftMax, setSqftMax] = useState('')
   const [hailSizeMin, setHailSizeMin] = useState('')
   const [hailSizeMax, setHailSizeMax] = useState('')
   const [hailDateFrom, setHailDateFrom] = useState('')
   const [hailDateTo, setHailDateTo] = useState('')
+
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   // ── Bulk action ──
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -77,10 +159,7 @@ export default function BulkTargets() {
   useEffect(() => {
     if (!currentUser?.email) return
     base44.entities.UserProfile.filter({ email: currentUser.email }, undefined, 1)
-      .then((d: any) => {
-        const profile = d[0]
-        setIsAdmin(profile?.role === 'admin')
-      })
+      .then((d: any) => setIsAdmin(d[0]?.role === 'admin'))
       .catch(() => setIsAdmin(false))
   }, [currentUser?.email])
 
@@ -93,21 +172,28 @@ export default function BulkTargets() {
 
   // ── Derived option lists ──
   const uniqueStates = useMemo(() => {
-    const states = new Set<string>()
+    const s = new Set<string>()
     for (const t of storeTargets as any[]) {
-      const s = extractState(t.line2 ?? '')
-      if (s) states.add(s)
+      const st = extractState(t.line2 ?? '')
+      if (st) s.add(st)
     }
-    return [...states].sort()
+    return [...s].sort().map(v => ({ value: v, label: v }))
   }, [storeTargets])
 
   const uniqueRoofMaterials = useMemo(() => {
-    const mats = new Set<string>()
+    const s = new Set<string>()
     for (const t of storeTargets as any[]) {
-      if (t.roof_material) mats.add(t.roof_material)
+      if (t.roof_material) s.add(t.roof_material)
     }
-    return [...mats].sort()
+    return [...s].sort().map(v => ({ value: v, label: v }))
   }, [storeTargets])
+
+  const reps = profiles.filter(p => p.role === 'rep' || p.role === 'admin')
+
+  const repOptions = useMemo(() => [
+    { value: '__unassigned__', label: 'Unassigned' },
+    ...reps.map(p => ({ value: p.email, label: p.full_name ?? p.email })),
+  ], [reps])
 
   // ── Filtering ──
   const filteredTargets = useMemo(() => {
@@ -124,30 +210,34 @@ export default function BulkTargets() {
 
     if (contactSearch.trim()) {
       const q = contactSearch.toLowerCase()
+      const qDigits = q.replace(/\D/g, '')
       targets = targets.filter(t =>
         (t.contacts ?? []).some((c: any) =>
           (c.name ?? '').toLowerCase().includes(q) ||
-          (c.phones ?? []).some((p: any) => (p.number ?? '').replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+          (c.phones ?? []).some((p: any) =>
+            qDigits && (p.number ?? '').replace(/\D/g, '').includes(qDigits)
+          )
         )
       )
     }
 
-    if (statusFilter !== 'all') {
-      targets = targets.filter(t => t.status === statusFilter)
+    if (statusFilter.size > 0) {
+      targets = targets.filter(t => statusFilter.has(t.status))
     }
 
     if (listFilter) {
       targets = targets.filter(t => t.list_id === listFilter)
     }
 
-    if (assignedFilter === 'assigned') {
-      targets = targets.filter(t => !!t.assigned_to)
-    } else if (assignedFilter === 'unassigned') {
-      targets = targets.filter(t => !t.assigned_to)
+    if (repFilter.size > 0) {
+      targets = targets.filter(t => {
+        if (!t.assigned_to) return repFilter.has('__unassigned__')
+        return repFilter.has(t.assigned_to)
+      })
     }
 
-    if (stateFilter) {
-      targets = targets.filter(t => extractState(t.line2 ?? '') === stateFilter)
+    if (stateFilter.size > 0) {
+      targets = targets.filter(t => stateFilter.has(extractState(t.line2 ?? '')))
     }
 
     if (hasPhoneFilter === 'yes') {
@@ -170,8 +260,8 @@ export default function BulkTargets() {
       )
     }
 
-    if (roofMaterialFilter) {
-      targets = targets.filter(t => t.roof_material === roofMaterialFilter)
+    if (roofMaterialFilter.size > 0) {
+      targets = targets.filter(t => roofMaterialFilter.has(t.roof_material))
     }
 
     if (sqftMin) {
@@ -203,140 +293,110 @@ export default function BulkTargets() {
 
     return targets
   }, [
-    storeTargets, search, contactSearch, statusFilter, listFilter, assignedFilter,
-    stateFilter, hasPhoneFilter, hasEmailFilter, propertyTypeSearch, roofMaterialFilter,
+    storeTargets, search, contactSearch,
+    statusFilter, listFilter, repFilter, stateFilter,
+    hasPhoneFilter, hasEmailFilter, propertyTypeSearch, roofMaterialFilter,
     sqftMin, sqftMax, hailSizeMin, hailSizeMax, hailDateFrom, hailDateTo,
   ])
 
-  const allFilterDeps = [
-    search, contactSearch, statusFilter, listFilter, assignedFilter,
-    stateFilter, hasPhoneFilter, hasEmailFilter, propertyTypeSearch, roofMaterialFilter,
+  useEffect(() => { setPage(0) }, [
+    search, contactSearch,
+    statusFilter, listFilter, repFilter, stateFilter,
+    hasPhoneFilter, hasEmailFilter, propertyTypeSearch, roofMaterialFilter,
     sqftMin, sqftMax, hailSizeMin, hailSizeMax, hailDateFrom, hailDateTo,
-  ]
-  useEffect(() => { setPage(0) }, allFilterDeps)
+  ])
 
   const pageCount = Math.max(1, Math.ceil(filteredTargets.length / PAGE_SIZE))
   const visibleTargets = filteredTargets.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-
   const allSelected = filteredTargets.length > 0 && filteredTargets.every(t => selected.has(t.id))
 
   function toggleAll() {
-    if (allSelected) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(filteredTargets.map((t: any) => t.id)))
-    }
+    setSelected(allSelected ? new Set() : new Set(filteredTargets.map((t: any) => t.id)))
   }
 
   function toggleOne(id: string) {
     setSelected(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
   }
 
-  function clearFilters() {
-    setSearch('')
-    setContactSearch('')
-    setStatusFilter('all')
-    setListFilter(null)
-    setAssignedFilter('all')
-    setStateFilter('')
-    setHasPhoneFilter('all')
-    setHasEmailFilter('all')
-    setPropertyTypeSearch('')
-    setRoofMaterialFilter('')
-    setSqftMin('')
-    setSqftMax('')
-    setHailSizeMin('')
-    setHailSizeMax('')
-    setHailDateFrom('')
-    setHailDateTo('')
-  }
-
   const hasActiveFilters =
-    search || contactSearch || statusFilter !== 'all' || listFilter ||
-    assignedFilter !== 'all' || stateFilter || hasPhoneFilter !== 'all' ||
-    hasEmailFilter !== 'all' || propertyTypeSearch || roofMaterialFilter ||
-    sqftMin || sqftMax || hailSizeMin || hailSizeMax || hailDateFrom || hailDateTo
+    !!search || !!contactSearch ||
+    statusFilter.size > 0 || !!listFilter || repFilter.size > 0 ||
+    stateFilter.size > 0 || hasPhoneFilter !== 'all' || hasEmailFilter !== 'all' ||
+    !!propertyTypeSearch || roofMaterialFilter.size > 0 ||
+    !!sqftMin || !!sqftMax || !!hailSizeMin || !!hailSizeMax ||
+    !!hailDateFrom || !!hailDateTo
+
+  function clearFilters() {
+    setSearch(''); setContactSearch('')
+    setStatusFilter(new Set()); setListFilter(null)
+    setRepFilter(new Set()); setStateFilter(new Set())
+    setHasPhoneFilter('all'); setHasEmailFilter('all')
+    setPropertyTypeSearch(''); setRoofMaterialFilter(new Set())
+    setSqftMin(''); setSqftMax('')
+    setHailSizeMin(''); setHailSizeMax('')
+    setHailDateFrom(''); setHailDateTo('')
+  }
 
   async function handleDelete() {
     if (selected.size === 0 || deleting) return
     if (!confirm(`Permanently delete ${selected.size.toLocaleString()} target${selected.size === 1 ? '' : 's'}? This cannot be undone.`)) return
-    setDeleting(true)
-    setDeleteError('')
+    setDeleting(true); setDeleteError('')
     const ids = [...selected]
     setDeleteProgress({ done: 0, total: ids.length })
-
     try {
       for (let i = 0; i < ids.length; i++) {
         let retries = 0
         while (true) {
-          try {
-            await base44.entities.Target.delete(ids[i])
-            break
-          } catch (e: any) {
+          try { await base44.entities.Target.delete(ids[i]); break }
+          catch (e: any) {
             if (retries++ >= 4) throw e
             await new Promise(r => setTimeout(r, 1500 * retries))
           }
         }
         setDeleteProgress({ done: i + 1, total: ids.length })
       }
-      setSelected(new Set())
-      await refresh()
+      setSelected(new Set()); await refresh()
     } catch {
       setDeleteError('Failed partway through. Some targets may not have been deleted.')
     } finally {
-      setDeleting(false)
-      setDeleteProgress(null)
+      setDeleting(false); setDeleteProgress(null)
     }
   }
 
   async function handleAssign() {
     if (!selectedRep || selected.size === 0 || assigning) return
-    setAssigning(true)
-    setAssignError('')
+    setAssigning(true); setAssignError('')
     const ids = [...selected]
     setAssignProgress({ done: 0, total: ids.length })
-
     try {
       for (let i = 0; i < ids.length; i++) {
         let retries = 0
         while (true) {
-          try {
-            await base44.entities.Target.update(ids[i], { assigned_to: selectedRep })
-            break
-          } catch (e: any) {
+          try { await base44.entities.Target.update(ids[i], { assigned_to: selectedRep }); break }
+          catch (e: any) {
             if (retries++ >= 4) throw e
             await new Promise(r => setTimeout(r, 1500 * retries))
           }
         }
         setAssignProgress({ done: i + 1, total: ids.length })
       }
-      setSelected(new Set())
-      setSelectedRep('')
-      await refresh()
-    } catch (e: any) {
+      setSelected(new Set()); setSelectedRep(''); await refresh()
+    } catch {
       setAssignError('Failed partway through. Some targets may not have been assigned.')
     } finally {
-      setAssigning(false)
-      setAssignProgress(null)
+      setAssigning(false); setAssignProgress(null)
     }
   }
 
   const listName = (listId: string) => (lists as any[]).find(l => l.id === listId)?.name ?? '—'
   const repName = (email: string) => profiles.find(p => p.email === email)?.full_name ?? email
-  const reps = profiles.filter(p => p.role === 'rep' || p.role === 'admin')
 
-  if (isAdmin === null) {
-    return <div className={styles.accessMsg}>Checking access…</div>
-  }
-
-  if (!isAdmin) {
-    return <div className={styles.accessMsg}>Access denied.</div>
-  }
+  if (isAdmin === null) return <div className={styles.accessMsg}>Checking access…</div>
+  if (!isAdmin) return <div className={styles.accessMsg}>Access denied.</div>
 
   return (
     <div className={styles.page}>
@@ -349,9 +409,7 @@ export default function BulkTargets() {
         <span className={styles.pageTitle}>BULK TARGETS</span>
         <span className={styles.totalCount}>
           {filteredTargets.length.toLocaleString()} targets
-          {!allTargetsLoaded && (
-            <span className={styles.loadingBadge}> · loading…</span>
-          )}
+          {!allTargetsLoaded && <span className={styles.loadingBadge}> · loading…</span>}
         </span>
       </motion.div>
 
@@ -380,7 +438,7 @@ export default function BulkTargets() {
             onChange={e => setContactSearch(e.target.value)}
           />
           <select
-            className={styles.filterSelect}
+            className={styles.listSelect}
             value={listFilter ?? ''}
             onChange={e => setListFilter(e.target.value || null)}
           >
@@ -404,9 +462,7 @@ export default function BulkTargets() {
             {hasActiveFilters && <span className={styles.filterActiveDot} />}
           </button>
           {hasActiveFilters && (
-            <button className={styles.clearFiltersBtn} onClick={clearFilters}>
-              Clear all
-            </button>
+            <button className={styles.clearFiltersBtn} onClick={clearFilters}>Clear all</button>
           )}
         </div>
 
@@ -421,72 +477,46 @@ export default function BulkTargets() {
               transition={{ duration: 0.2, ease: EASE }}
             >
               <div className={styles.filterGrid}>
-                {/* Row 1 */}
                 <div className={styles.filterCell}>
                   <label className={styles.filterLabel}>REP</label>
-                  <select
-                    className={styles.filterSelect}
-                    value={assignedFilter}
-                    onChange={e => setAssignedFilter(e.target.value as AssignedFilter)}
-                  >
-                    <option value="all">All Reps</option>
-                    <option value="unassigned">Unassigned</option>
-                    <option value="assigned">Assigned</option>
-                    {reps.map(p => (
-                      <option key={p.id} value={p.email}>
-                        {p.full_name ?? p.email}
-                      </option>
-                    ))}
-                  </select>
+                  <MultiSelect
+                    options={repOptions}
+                    selected={repFilter}
+                    onChange={setRepFilter}
+                    placeholder="All Reps"
+                  />
                 </div>
 
                 <div className={styles.filterCell}>
                   <label className={styles.filterLabel}>STATUS</label>
-                  <select
-                    className={styles.filterSelect}
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="new">New</option>
-                    <option value="called">Called</option>
-                    <option value="callback">Callback</option>
-                    <option value="not_interested">Not Interested</option>
-                    <option value="sold">Inspection Set</option>
-                    <option value="overwatch">Overwatch</option>
-                    <option value="crm_sent">CRM Sent</option>
-                  </select>
+                  <MultiSelect
+                    options={STATUS_OPTIONS}
+                    selected={statusFilter}
+                    onChange={setStatusFilter}
+                    placeholder="All Statuses"
+                  />
                 </div>
 
                 <div className={styles.filterCell}>
                   <label className={styles.filterLabel}>STATE</label>
-                  <select
-                    className={styles.filterSelect}
-                    value={stateFilter}
-                    onChange={e => setStateFilter(e.target.value)}
-                  >
-                    <option value="">All States</option>
-                    {uniqueStates.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  <MultiSelect
+                    options={uniqueStates}
+                    selected={stateFilter}
+                    onChange={setStateFilter}
+                    placeholder="All States"
+                  />
                 </div>
 
                 <div className={styles.filterCell}>
                   <label className={styles.filterLabel}>ROOF MATERIAL</label>
-                  <select
-                    className={styles.filterSelect}
-                    value={roofMaterialFilter}
-                    onChange={e => setRoofMaterialFilter(e.target.value)}
-                  >
-                    <option value="">All Materials</option>
-                    {uniqueRoofMaterials.map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
+                  <MultiSelect
+                    options={uniqueRoofMaterials}
+                    selected={roofMaterialFilter}
+                    onChange={setRoofMaterialFilter}
+                    placeholder="All Materials"
+                  />
                 </div>
 
-                {/* Row 2 */}
                 <div className={styles.filterCell}>
                   <label className={styles.filterLabel}>HAS PHONE</label>
                   <select
@@ -534,7 +564,6 @@ export default function BulkTargets() {
                   />
                 </div>
 
-                {/* Row 3 */}
                 <div className={styles.filterCell}>
                   <label className={styles.filterLabel}>SQFT MAX</label>
                   <input
@@ -580,7 +609,6 @@ export default function BulkTargets() {
                   />
                 </div>
 
-                {/* Row 4 */}
                 <div className={styles.filterCell}>
                   <label className={styles.filterLabel}>HAIL DATE TO</label>
                   <input
@@ -606,12 +634,7 @@ export default function BulkTargets() {
             <thead>
               <tr className={styles.thead}>
                 <th className={styles.thCheck}>
-                  <input
-                    type="checkbox"
-                    className={styles.checkbox}
-                    checked={allSelected}
-                    onChange={toggleAll}
-                  />
+                  <input type="checkbox" className={styles.checkbox} checked={allSelected} onChange={toggleAll} />
                 </th>
                 <th className={styles.th}>Address</th>
                 <th className={styles.th}>List</th>
@@ -628,12 +651,7 @@ export default function BulkTargets() {
                   onClick={() => toggleOne(t.id)}
                 >
                   <td className={styles.tdCheck} onClick={e => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      className={styles.checkbox}
-                      checked={selected.has(t.id)}
-                      onChange={() => toggleOne(t.id)}
-                    />
+                    <input type="checkbox" className={styles.checkbox} checked={selected.has(t.id)} onChange={() => toggleOne(t.id)} />
                   </td>
                   <td className={styles.td}>
                     <div className={styles.addrLine1}>{t.line1}</div>
@@ -662,8 +680,7 @@ export default function BulkTargets() {
                   <td className={styles.td}>
                     {t.assigned_to
                       ? <span className={styles.assignedTo}>{repName(t.assigned_to)}</span>
-                      : <span className={styles.dash}>—</span>
-                    }
+                      : <span className={styles.dash}>—</span>}
                   </td>
                 </tr>
               ))}
@@ -674,20 +691,12 @@ export default function BulkTargets() {
 
       {pageCount > 1 && (
         <div className={styles.pagination}>
-          <button
-            className={styles.pageBtn}
-            disabled={page === 0}
-            onClick={() => setPage(p => p - 1)}
-          >← Prev</button>
+          <button className={styles.pageBtn} disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</button>
           <span className={styles.pageLabel}>
             {page + 1} / {pageCount}
             <span className={styles.pageSubLabel}> ({filteredTargets.length.toLocaleString()} total)</span>
           </span>
-          <button
-            className={styles.pageBtn}
-            disabled={page >= pageCount - 1}
-            onClick={() => setPage(p => p + 1)}
-          >Next →</button>
+          <button className={styles.pageBtn} disabled={page >= pageCount - 1} onClick={() => setPage(p => p + 1)}>Next →</button>
         </div>
       )}
 
@@ -698,9 +707,7 @@ export default function BulkTargets() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease: EASE }}
         >
-          <span className={styles.selectedCount}>
-            {selected.size.toLocaleString()} selected
-          </span>
+          <span className={styles.selectedCount}>{selected.size.toLocaleString()} selected</span>
           <select
             className={styles.repSelect}
             value={selectedRep}
@@ -709,39 +716,17 @@ export default function BulkTargets() {
           >
             <option value="">Assign to rep…</option>
             {reps.map(p => (
-              <option key={p.id} value={p.email}>
-                {p.full_name ?? p.email}
-              </option>
+              <option key={p.id} value={p.email}>{p.full_name ?? p.email}</option>
             ))}
           </select>
-          <button
-            className={styles.assignBtn}
-            disabled={!selectedRep || assigning || deleting}
-            onClick={handleAssign}
-          >
-            {assigning && assignProgress
-              ? `${assignProgress.done}/${assignProgress.total}…`
-              : assigning
-              ? 'Assigning…'
-              : 'Assign'}
+          <button className={styles.assignBtn} disabled={!selectedRep || assigning || deleting} onClick={handleAssign}>
+            {assigning && assignProgress ? `${assignProgress.done}/${assignProgress.total}…` : assigning ? 'Assigning…' : 'Assign'}
           </button>
-          <button
-            className={styles.clearBtn}
-            disabled={assigning || deleting}
-            onClick={() => setSelected(new Set())}
-          >
+          <button className={styles.clearBtn} disabled={assigning || deleting} onClick={() => setSelected(new Set())}>
             Clear
           </button>
-          <button
-            className={styles.deleteBtn}
-            disabled={assigning || deleting}
-            onClick={handleDelete}
-          >
-            {deleting && deleteProgress
-              ? `Deleting ${deleteProgress.done}/${deleteProgress.total}…`
-              : deleting
-              ? 'Deleting…'
-              : 'Delete Selected'}
+          <button className={styles.deleteBtn} disabled={assigning || deleting} onClick={handleDelete}>
+            {deleting && deleteProgress ? `Deleting ${deleteProgress.done}/${deleteProgress.total}…` : deleting ? 'Deleting…' : 'Delete Selected'}
           </button>
           {assignError && <span className={styles.assignError}>{assignError}</span>}
           {deleteError && <span className={styles.assignError}>{deleteError}</span>}
