@@ -33,7 +33,13 @@ export default function Login({ onLogin }: LoginProps) {
       onLogin(user as unknown as AppUser)
     } catch (err: any) {
       const status = err?.response?.status ?? err?.status ?? err?.statusCode
-      if (status === 403) {
+      const msg = (err?.response?.data?.message ?? err?.response?.data?.detail ?? '').toLowerCase()
+      const needsOtp = (status === 400 || status === 403)
+        && !msg.includes('invalid')
+        && !msg.includes('incorrect')
+        && !msg.includes('wrong')
+        && !msg.includes('not found')
+      if (needsOtp) {
         setStep('otp')
       } else {
         triggerShake('Invalid email or password.')
