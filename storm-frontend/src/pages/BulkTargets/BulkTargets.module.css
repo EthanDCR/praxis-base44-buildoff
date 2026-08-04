@@ -246,6 +246,11 @@
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
 
+.multiSelectDropdownUp {
+  top: unset;
+  bottom: calc(100% + 4px);
+}
+
 .multiSelectOption {
   display: flex;
   align-items: center;
@@ -471,6 +476,19 @@
   color: #f87171;
   margin-left: 4px;
 }
+
+.editRowBtn {
+  padding: 4px 10px;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 3px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.editRowBtn:hover { border-color: rgba(255,255,255,0.25); color: var(--text-primary); }
 
 .deleteBtn {
   padding: 8px 16px;

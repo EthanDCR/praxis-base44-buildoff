@@ -47,8 +47,9 @@ export default function Login({ onLogin }: LoginProps) {
       // 400 without a "wrong password" message = account exists but unverified.
       // Fall back to checking UserProfile so no OTP is needed.
       try {
-        const profiles = await base44.entities.UserProfile.filter({ email }, undefined, 1) as any[]
-        if (profiles.length > 0) {
+        const profiles = await base44.entities.UserProfile.filter({ email }, undefined, 20) as any[]
+        const match = profiles.find((p: any) => p.email?.toLowerCase() === email.toLowerCase())
+        if (match) {
           onLogin({ email } as AppUser)
           return
         }

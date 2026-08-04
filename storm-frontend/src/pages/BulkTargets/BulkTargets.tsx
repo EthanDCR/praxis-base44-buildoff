@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react'
 import { base44 } from '../../lib/base44'
 import { useUser } from '../../lib/user-context'
 import { useDataStore } from '../../lib/data-store'
+import { extractState, filterTargets } from '../../lib/target-filters'
+import EditTargetModal from '../../components/EditTargetModal/EditTargetModal'
 import styles from './BulkTargets.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -28,11 +30,6 @@ const STATUS_LABEL: Record<string, string> = Object.fromEntries(
   STATUS_OPTIONS.map(o => [o.value, o.label])
 )
 
-function extractState(line2: string): string {
-  const m = /,\s*([A-Z]{2})\s+\d{5}/.exec(line2 ?? '')
-  return m ? m[1] : ''
-}
-
 /* ── MultiSelect dropdown ──────────────────────────────────── */
 
 function MultiSelect({
@@ -40,11 +37,13 @@ function MultiSelect({
   selected,
   onChange,
   placeholder,
+  openUp = false,
 }: {
   options: { value: string; label: string }[]
   selected: Set<string>
   onChange: (next: Set<string>) => void
   placeholder: string
+  openUp?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -92,7 +91,7 @@ function MultiSelect({
         </svg>
       </button>
       {open && (
-        <div className={styles.multiSelectDropdown}>
+        <div className={`${styles.multiSelectDropdown}${openUp ? ' ' + styles.multiSelectDropdownUp : ''}`}>
           {options.map(o => (
             <label key={o.value} className={styles.multiSelectOption}>
               <input
@@ -148,13 +147,14 @@ export default function BulkTargets() {
 
   // ── Bulk action ──
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [selectedRep, setSelectedRep] = useState('')
+  const [selectedReps, setSelectedReps] = useState<Set<string>>(new Set())
   const [assigning, setAssigning] = useState(false)
   const [assignProgress, setAssignProgress] = useState<{ done: number; total: number } | null>(null)
   const [assignError, setAssignError] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteProgress, setDeleteProgress] = useState<{ done: number; total: number } | null>(null)
   const [deleteError, setDeleteError] = useState('')
+  const [editingTarget, setEditingTarget] = useState<any | null>(null)
 
   useEffect(() => {
     if (!currentUser?.email) return
@@ -195,104 +195,19 @@ export default function BulkTargets() {
     ...reps.map(p => ({ value: p.email, label: p.full_name ?? p.email })),
   ], [reps])
 
+  const assignRepOptions = useMemo(() =>
+    reps.map(p => ({ value: p.email, label: p.full_name ?? p.email }))
+  , [reps])
+
   // ── Filtering ──
-  const filteredTargets = useMemo(() => {
-    let targets = storeTargets as any[]
-
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      targets = targets.filter(t =>
-        (t.line1 ?? '').toLowerCase().includes(q) ||
-        (t.line2 ?? '').toLowerCase().includes(q) ||
-        (t.contacts ?? []).some((c: any) => (c.company ?? '').toLowerCase().includes(q))
-      )
-    }
-
-    if (contactSearch.trim()) {
-      const q = contactSearch.toLowerCase()
-      const qDigits = q.replace(/\D/g, '')
-      targets = targets.filter(t =>
-        (t.contacts ?? []).some((c: any) =>
-          (c.name ?? '').toLowerCase().includes(q) ||
-          (c.phones ?? []).some((p: any) =>
-            qDigits && (p.number ?? '').replace(/\D/g, '').includes(qDigits)
-          )
-        )
-      )
-    }
-
-    if (statusFilter.size > 0) {
-      targets = targets.filter(t => statusFilter.has(t.status))
-    }
-
-    if (listFilter) {
-      targets = targets.filter(t => t.list_id === listFilter)
-    }
-
-    if (repFilter.size > 0) {
-      targets = targets.filter(t => {
-        if (!t.assigned_to) return repFilter.has('__unassigned__')
-        return repFilter.has(t.assigned_to)
-      })
-    }
-
-    if (stateFilter.size > 0) {
-      targets = targets.filter(t => stateFilter.has(extractState(t.line2 ?? '')))
-    }
-
-    if (hasPhoneFilter === 'yes') {
-      targets = targets.filter(t => (t.contacts ?? []).some((c: any) => (c.phones ?? []).length > 0))
-    } else if (hasPhoneFilter === 'no') {
-      targets = targets.filter(t => !(t.contacts ?? []).some((c: any) => (c.phones ?? []).length > 0))
-    }
-
-    if (hasEmailFilter === 'yes') {
-      targets = targets.filter(t => (t.contacts ?? []).some((c: any) => (c.emails ?? []).length > 0))
-    } else if (hasEmailFilter === 'no') {
-      targets = targets.filter(t => !(t.contacts ?? []).some((c: any) => (c.emails ?? []).length > 0))
-    }
-
-    if (propertyTypeSearch.trim()) {
-      const q = propertyTypeSearch.toLowerCase()
-      targets = targets.filter(t =>
-        (t.property_type ?? '').toLowerCase().includes(q) ||
-        (t.property_subtype ?? '').toLowerCase().includes(q)
-      )
-    }
-
-    if (roofMaterialFilter.size > 0) {
-      targets = targets.filter(t => roofMaterialFilter.has(t.roof_material))
-    }
-
-    if (sqftMin) {
-      const n = parseFloat(sqftMin)
-      if (!isNaN(n)) targets = targets.filter(t => (t.square_footage ?? 0) >= n)
-    }
-    if (sqftMax) {
-      const n = parseFloat(sqftMax)
-      if (!isNaN(n)) targets = targets.filter(t => (t.square_footage ?? Infinity) <= n)
-    }
-
-    if (hailSizeMin) {
-      const n = parseFloat(hailSizeMin)
-      if (!isNaN(n)) targets = targets.filter(t => (t.hail_size ?? 0) >= n)
-    }
-    if (hailSizeMax) {
-      const n = parseFloat(hailSizeMax)
-      if (!isNaN(n)) targets = targets.filter(t => (t.hail_size ?? Infinity) <= n)
-    }
-
-    if (hailDateFrom) {
-      const from = new Date(hailDateFrom).getTime()
-      targets = targets.filter(t => t.hail_date && new Date(t.hail_date).getTime() >= from)
-    }
-    if (hailDateTo) {
-      const to = new Date(hailDateTo).getTime()
-      targets = targets.filter(t => t.hail_date && new Date(t.hail_date).getTime() <= to)
-    }
-
-    return targets
-  }, [
+  const filteredTargets = useMemo(() => filterTargets(storeTargets as any[], {
+    search, contactSearch,
+    statusFilter, listFilter, repFilter, stateFilter,
+    hasPhoneFilter: hasPhoneFilter as 'all' | 'yes' | 'no',
+    hasEmailFilter: hasEmailFilter as 'all' | 'yes' | 'no',
+    propertyTypeSearch, roofMaterialFilter,
+    sqftMin, sqftMax, hailSizeMin, hailSizeMax, hailDateFrom, hailDateTo,
+  }), [
     storeTargets, search, contactSearch,
     statusFilter, listFilter, repFilter, stateFilter,
     hasPhoneFilter, hasEmailFilter, propertyTypeSearch, roofMaterialFilter,
@@ -368,23 +283,30 @@ export default function BulkTargets() {
   }
 
   async function handleAssign() {
-    if (!selectedRep || selected.size === 0 || assigning) return
+    if (selectedReps.size === 0 || selected.size === 0 || assigning) return
     setAssigning(true); setAssignError('')
     const ids = [...selected]
+    const repsArr = [...selectedReps]
     setAssignProgress({ done: 0, total: ids.length })
     try {
-      for (let i = 0; i < ids.length; i++) {
-        let retries = 0
-        while (true) {
-          try { await base44.entities.Target.update(ids[i], { assigned_to: selectedRep }); break }
-          catch (e: any) {
-            if (retries++ >= 4) throw e
-            await new Promise(r => setTimeout(r, 1500 * retries))
+      const chunkSize = Math.ceil(ids.length / repsArr.length)
+      let doneCount = 0
+      for (let ri = 0; ri < repsArr.length; ri++) {
+        const slice = ids.slice(ri * chunkSize, (ri + 1) * chunkSize)
+        for (const id of slice) {
+          let retries = 0
+          while (true) {
+            try { await base44.entities.Target.update(id, { assigned_to: repsArr[ri] }); break }
+            catch (e: any) {
+              if (retries++ >= 4) throw e
+              await new Promise(r => setTimeout(r, 1500 * retries))
+            }
           }
+          doneCount++
+          setAssignProgress({ done: doneCount, total: ids.length })
         }
-        setAssignProgress({ done: i + 1, total: ids.length })
       }
-      setSelected(new Set()); setSelectedRep(''); await refresh()
+      setSelected(new Set()); setSelectedReps(new Set()); await refresh()
     } catch {
       setAssignError('Failed partway through. Some targets may not have been assigned.')
     } finally {
@@ -400,6 +322,16 @@ export default function BulkTargets() {
 
   return (
     <div className={styles.page}>
+      {editingTarget && (
+        <EditTargetModal
+          target={editingTarget}
+          onClose={() => setEditingTarget(null)}
+          onSaved={() => {
+            setEditingTarget(null)
+            refresh()
+          }}
+        />
+      )}
       <motion.div
         className={styles.topBar}
         initial={{ opacity: 0, y: -8 }}
@@ -641,6 +573,7 @@ export default function BulkTargets() {
                 <th className={styles.th}>Status</th>
                 <th className={styles.th}>Hail</th>
                 <th className={styles.th}>Assigned To</th>
+                <th className={styles.th}></th>
               </tr>
             </thead>
             <tbody>
@@ -682,6 +615,14 @@ export default function BulkTargets() {
                       ? <span className={styles.assignedTo}>{repName(t.assigned_to)}</span>
                       : <span className={styles.dash}>—</span>}
                   </td>
+                  <td className={styles.td} onClick={e => e.stopPropagation()}>
+                    <button
+                      className={styles.editRowBtn}
+                      onClick={() => setEditingTarget(t)}
+                    >
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -708,21 +649,22 @@ export default function BulkTargets() {
           transition={{ duration: 0.2, ease: EASE }}
         >
           <span className={styles.selectedCount}>{selected.size.toLocaleString()} selected</span>
-          <select
-            className={styles.repSelect}
-            value={selectedRep}
-            onChange={e => setSelectedRep(e.target.value)}
-            disabled={assigning || deleting}
-          >
-            <option value="">Assign to rep…</option>
-            {reps.map(p => (
-              <option key={p.id} value={p.email}>{p.full_name ?? p.email}</option>
-            ))}
-          </select>
-          <button className={styles.assignBtn} disabled={!selectedRep || assigning || deleting} onClick={handleAssign}>
-            {assigning && assignProgress ? `${assignProgress.done}/${assignProgress.total}…` : assigning ? 'Assigning…' : 'Assign'}
+          <div style={{ width: 220, flexShrink: 0, opacity: (assigning || deleting) ? 0.4 : 1, pointerEvents: (assigning || deleting) ? 'none' : 'auto' }}>
+            <MultiSelect
+              options={assignRepOptions}
+              selected={selectedReps}
+              onChange={setSelectedReps}
+              placeholder="Assign to rep(s)…"
+              openUp
+            />
+          </div>
+          <button className={styles.assignBtn} disabled={selectedReps.size === 0 || assigning || deleting} onClick={handleAssign}>
+            {assigning && assignProgress
+              ? `${assignProgress.done}/${assignProgress.total}…`
+              : assigning ? 'Assigning…'
+              : selectedReps.size > 1 ? 'Split & Assign' : 'Assign'}
           </button>
-          <button className={styles.clearBtn} disabled={assigning || deleting} onClick={() => setSelected(new Set())}>
+          <button className={styles.clearBtn} disabled={assigning || deleting} onClick={() => { setSelected(new Set()); setSelectedReps(new Set()) }}>
             Clear
           </button>
           <button className={styles.deleteBtn} disabled={assigning || deleting} onClick={handleDelete}>

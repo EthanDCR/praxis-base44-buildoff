@@ -1,0 +1,20 @@
+
+-- bulk assign button where he can select multiple reps and then assign them to multiple reps evenly (today)
+
+-- delete target button (today)
+
+-- unassign targets 
+
+-- after adding owner to target card (making an edit to target card, twilio no longer connected)
+
+-- call routing correctly 
+
+-- less small targets (just add filter) 
+
+-- unassign button instead of delete button so they can get small targets off their list
+
+-- refreshed page and now all targets that have already been called aren't 
+
+-- sharing targets when it should only be assinged to one person
+
+-- remove targets from list

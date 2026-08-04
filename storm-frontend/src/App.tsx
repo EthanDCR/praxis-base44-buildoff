@@ -48,15 +48,15 @@ export default function App() {
 
   async function resolveUser(me: AppUser): Promise<AppUser> {
     try {
-      const profiles = await base44.entities.UserProfile.filter({ email: me.email }, undefined, 1) as any[]
-      const profile = profiles[0]
+      const profiles = await base44.entities.UserProfile.filter({ email: me.email }, undefined, 20) as any[]
+      // Client-side match in case the API returns all profiles without auth filtering
+      const profile = profiles.find((p: any) => p.email?.toLowerCase() === me.email?.toLowerCase())
       if (profile?.role) return { ...me, role: profile.role }
     } catch {}
     return me
   }
 
   async function onSplashDone() {
-    if (import.meta.env.DEV) { setPhase('app'); return }
     try {
       const stored = localStorage.getItem('praxis_session')
       if (stored) {

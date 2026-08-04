@@ -40,13 +40,22 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setSwaths(s as any[])
 
       if (isRep) {
-        // Reps only fetch their assigned targets — fast
-        const t = await base44.entities.Target.filter(
-          { assigned_to: user!.email }, undefined, 1000
-        ) as any[]
-        if (loadId !== loadIdRef.current) return
-        setTargets(t)
-        setLoading(false)
+        // Reps go through fallback login (unverified Base44 accounts) so there's
+        // no auth token — server-side filter is ignored on unauthenticated requests.
+        // Load all targets in pages and filter entirely client-side.
+        const PAGE = 500
+        let skip = 0
+        const all: any[] = []
+        const repEmail = user!.email!.toLowerCase()
+        while (true) {
+          const page = await base44.entities.Target.filter({}, undefined, PAGE, skip) as any[]
+          if (loadId !== loadIdRef.current) return
+          all.push(...page.filter((x: any) => x.assigned_to?.toLowerCase() === repEmail))
+          setTargets([...all])
+          if (skip === 0) setLoading(false)
+          if (page.length < PAGE) break
+          skip += PAGE
+        }
         setAllTargetsLoaded(true)
       } else {
         // Admins: stream all targets in pages, unlock UI after first page
@@ -70,7 +79,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  useEffect(() => { load() }, [])
+  // Re-run when user's email or role changes (role resolves async after mount)
+  useEffect(() => { load() }, [user?.email, user?.role])
 
   async function updateTarget(id: string, patch: Record<string, any>) {
     await base44.entities.Target.update(id, patch)

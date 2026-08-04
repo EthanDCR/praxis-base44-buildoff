@@ -5,6 +5,7 @@ import { Device, Call } from '@twilio/voice-sdk'
 import { base44 } from '../../lib/base44'
 import { useDataStore } from '../../lib/data-store'
 import { useUser } from '../../lib/user-context'
+import EditTargetModal from '../../components/EditTargetModal/EditTargetModal'
 import styles from './SpeedDial.module.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -148,9 +149,10 @@ export default function SpeedDial() {
     const byList = activeListId
       ? (storeTargets as any[]).filter(t => t.list_id === activeListId)
       : (storeTargets as any[])
+    const repEmail = isRepMode ? user!.email.toLowerCase() : null
     const byAssignment = !isRepMode
       ? byList
-      : byList.filter(t => t.assigned_to === user!.email)
+      : byList.filter((t: any) => t.assigned_to?.toLowerCase() === repEmail)
     return byAssignment
       .filter(t => t.status !== 'sold')
       .sort((a: any, b: any) => (b.created_date ?? '').localeCompare(a.created_date ?? ''))
@@ -165,6 +167,8 @@ export default function SpeedDial() {
       }))
   }, [storeTargets, activeListId, user, isRepMode])
   const [saving, setSaving]             = useState(false)
+  const [unassigning, setUnassigning]   = useState(false)
+  const [editingTarget, setEditingTarget] = useState<Target | null>(null)
   const [showListDrop, setShowListDrop]     = useState(false)
   const [showFilterDrop, setShowFilterDrop] = useState(false)
 
@@ -466,6 +470,21 @@ export default function SpeedDial() {
     }
   }
 
+  async function unassignTarget() {
+    if (!activeId || unassigning) return
+    const id = activeId
+    const next = findNext(id)
+    setUnassigning(true)
+    try {
+      await updateTarget(id, { assigned_to: null })
+      setActiveId(next?.id ?? null)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setUnassigning(false)
+    }
+  }
+
   async function setPhoneQuality(contactIdx: number, phoneIdx: number, quality: NumberQuality | null) {
     if (!activeId) return
     const id = activeId
@@ -582,6 +601,17 @@ export default function SpeedDial() {
 
   return (
     <div className={styles.page}>
+
+      {editingTarget && (
+        <EditTargetModal
+          target={editingTarget}
+          onClose={() => setEditingTarget(null)}
+          onSaved={updated => {
+            setEditingTarget(null)
+            updateTarget(updated.id, updated)
+          }}
+        />
+      )}
 
       {/* ── Incoming call overlay ───────────────────────────────────── */}
       <AnimatePresence>
@@ -926,6 +956,10 @@ export default function SpeedDial() {
                       <div className={styles.navBtns}>
                         <button className={styles.navBtn} onClick={() => stepTarget(-1)}>← Prev</button>
                         <button className={styles.navBtn} onClick={() => stepTarget(1)}>Next →</button>
+                        <button className={styles.navBtn} onClick={() => setEditingTarget(activeTarget)}>Edit</button>
+                        <button className={styles.unassignBtn} onClick={unassignTarget} disabled={unassigning}>
+                          {unassigning ? 'Removing…' : 'Unassign'}
+                        </button>
                       </div>
                     </div>
                   </div>

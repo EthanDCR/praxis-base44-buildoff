@@ -1,0 +1,23 @@
+[
+  {
+    "id": "6a6e857f348c730a62cd9d65",
+    "line1": "884 North Rohlwing Road",
+    "lat": 41.909308288605274,
+    "lng": -88.03563681804957,
+    "error": "HTTP 401: <!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\r\n<html xml"
+  },
+  {
+    "id": "6a6e7db185f9b3ad6d16efcd",
+    "line1": "455 Dunbar Avenue",
+    "lat": 43.005775657159745,
+    "lng": -88.23621672155524,
+    "error": "HTTP 401: <!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\r\n<html xml"
+  },
+  {
+    "id": "6a6e8572c85dd104e38d6eab",
+    "line1": "1711 West Fullerton Avenue",
+    "lat": 41.91803058797083,
+    "lng": -88.03024384201298,
+    "error": "HTTP 401: <!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\r\n<html xml"
+  }
+]

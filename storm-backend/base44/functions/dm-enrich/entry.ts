@@ -68,6 +68,8 @@ Deno.serve(async (req: Request) => {
     square_footage:   result.living_area_sqft ?? null,
     estimated_value:  result.estimated_value ?? null,
     equity_percent:   result.estimated_equity_percentage ?? null,
+    lat:              result.latitude  ?? result.lat ?? null,
+    lng:              result.longitude ?? result.lng ?? null,
     contacts,
   }, { headers: CORS })
 })

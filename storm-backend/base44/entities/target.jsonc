@@ -117,6 +117,22 @@
     "assigned_to": {
       "type": "string",
       "description": "Email of the rep this target is assigned to"
+    },
+    "hail_history": {
+      "type": "array",
+      "description": "Full hail event history from IHM (5 years), newest first",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "description": "ISO date YYYY-MM-DD" },
+          "size": { "type": "number", "description": "Max hail size in inches" }
+        }
+      }
+    },
+    "hail_history_fetched_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When hail_history was last populated — skips already-fetched targets on re-run"
     }
   },
   "required": ["list_id", "line1"],

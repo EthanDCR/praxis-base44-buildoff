@@ -491,6 +491,17 @@
 }
 .navBtn:hover { color: var(--text-secondary); }
 
+.unassignBtn {
+  background: none; border: none;
+  color: rgba(239,68,68,0.45); font-family: inherit;
+  font-size: 0.75rem; font-weight: 500;
+  padding: 4px 8px; border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+.unassignBtn:hover:not(:disabled) { color: rgba(239,68,68,0.8); }
+.unassignBtn:disabled { opacity: 0.4; cursor: default; }
+
 /* Property meta */
 .propMeta {
   padding: 8px 20px;
