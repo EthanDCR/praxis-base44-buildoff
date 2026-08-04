@@ -149,10 +149,8 @@ export default function SpeedDial() {
     const byList = activeListId
       ? (storeTargets as any[]).filter(t => t.list_id === activeListId)
       : (storeTargets as any[])
-    const repEmail = isRepMode ? user!.email.toLowerCase() : null
-    const byAssignment = !isRepMode
-      ? byList
-      : byList.filter((t: any) => t.assigned_to?.toLowerCase() === repEmail)
+    const userEmail = user?.email?.toLowerCase() ?? ''
+    const byAssignment = byList.filter((t: any) => t.assigned_to?.toLowerCase() === userEmail)
     return byAssignment
       .filter(t => t.status !== 'sold')
       .sort((a: any, b: any) => (b.created_date ?? '').localeCompare(a.created_date ?? ''))
@@ -897,7 +895,7 @@ export default function SpeedDial() {
                 <motion.div key="done" className={styles.emptyState}
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   {targets.length === 0
-                    ? isRepMode ? 'No targets assigned to you yet — check with your manager' : 'No targets in this list'
+                    ? 'No targets assigned to you yet'
                     : 'All done — no targets left to work'
                   }
                 </motion.div>
