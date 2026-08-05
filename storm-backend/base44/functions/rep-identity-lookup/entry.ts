@@ -35,8 +35,9 @@ Deno.serve(async (req: Request) => {
       undefined,
       1
     ) as any[]
-    if (profiles[0]?.twilio_identity) {
-      identity = profiles[0].twilio_identity
+    if (profiles[0]?.email) {
+      // Derive identity the same way the frontend does — no stored field needed
+      identity = profiles[0].email.replace(/[^a-zA-Z0-9_-]/g, '_')
       break
     }
   }

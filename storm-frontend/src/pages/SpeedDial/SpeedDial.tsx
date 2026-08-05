@@ -162,8 +162,6 @@ export default function SpeedDial() {
   const [hailDateFrom, setHailDateFrom] = useState('')
   const [hailDateTo, setHailDateTo]     = useState('')
 
-  const isRepMode = !!user && user.role !== 'admin'
-
   // Derive targets for the selected list, excluding sold.
   // Normalize contacts.phones — old targets stored phones as plain strings;
   // new targets store them as {number, type} objects.
@@ -203,17 +201,15 @@ export default function SpeedDial() {
   const [hailData, setHailData]       = useState<HailEvent[] | null>(null)
   const [hailLoading, setHailLoading] = useState(false)
 
-  // Rep's assigned Twilio profile
-  const [repTwilioIdentity, setRepTwilioIdentity] = useState<string | null>(null)
-  const [repTwilioNumber, setRepTwilioNumber]     = useState<string | null>(null)
+  // Rep's Twilio number (for display only — identity is derived from email, no DB fetch needed)
+  const [repTwilioNumber, setRepTwilioNumber] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user?.email) return
     base44.entities.UserProfile.filter({ email: user.email }, undefined, 20)
       .then((d: any) => {
         const p = (d as any[]).find((x: any) => x.email?.toLowerCase() === user.email!.toLowerCase())
-        if (p?.twilio_identity) setRepTwilioIdentity(p.twilio_identity)
-        if (p?.twilio_number)   setRepTwilioNumber(p.twilio_number)
+        if (p?.twilio_number) setRepTwilioNumber(p.twilio_number)
       })
       .catch(console.error)
   }, [user?.email])
@@ -250,14 +246,12 @@ export default function SpeedDial() {
     })
   }, [targets])
 
-  // Initialize Twilio Device — wait until we know the rep's identity
+  // Initialize Twilio Device — identity derived from email, always deterministic
   useEffect(() => {
-    // Only set up once we have a user; for reps, wait for their profile to load
     if (!user) return
-    if (isRepMode && !repTwilioIdentity) return
 
     const baseUrl = import.meta.env.VITE_TWILIO_TOKEN_URL || '/twilio-token'
-    const identity = repTwilioIdentity ?? user.email.replace(/[^a-zA-Z0-9_-]/g, '_')
+    const identity = user.email.replace(/[^a-zA-Z0-9_-]/g, '_')
     const tokenUrl = `${baseUrl}?identity=${encodeURIComponent(identity)}`
 
     let device: Device
@@ -290,7 +284,7 @@ export default function SpeedDial() {
 
     setup()
     return () => { device?.destroy() }
-  }, [user, isRepMode, repTwilioIdentity])
+  }, [user])
 
 
 
