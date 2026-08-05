@@ -139,14 +139,13 @@ function googleMapsEmbedUrl(target: Target): string {
 
 export default function SpeedDial() {
   const location = useLocation()
-  const navState = (location.state ?? {}) as { targetId?: string; listId?: string }
+  const navState = (location.state ?? {}) as { targetId?: string }
 
   const user = useUser()
-  const { lists, targets: storeTargets, loading: loadingTargets, updateTarget, refresh } = useDataStore()
+  const { targets: storeTargets, loading: loadingTargets, updateTarget, refresh } = useDataStore()
 
   useEffect(() => { refresh() }, [])
-  const [activeListId, setActiveListId] = useState<string | null>(null)
-  const [activeId, setActiveId]         = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [search, setSearch]             = useState('')
   const [contactSearch, setContactSearch] = useState('')
   const [filtersOpen, setFiltersOpen]   = useState(false)
@@ -169,13 +168,9 @@ export default function SpeedDial() {
   // Normalize contacts.phones — old targets stored phones as plain strings;
   // new targets store them as {number, type} objects.
   const targets = useMemo((): Target[] => {
-    const byList = activeListId
-      ? (storeTargets as any[]).filter(t => t.list_id === activeListId)
-      : (storeTargets as any[])
     const userEmail = user?.email?.toLowerCase() ?? ''
-    const byAssignment = byList.filter((t: any) => t.assigned_to?.toLowerCase() === userEmail)
-    return byAssignment
-      .filter(t => t.status !== 'sold')
+    return (storeTargets as any[])
+      .filter((t: any) => t.assigned_to?.toLowerCase() === userEmail && t.status !== 'sold')
       .sort((a: any, b: any) => (b.created_date ?? '').localeCompare(a.created_date ?? ''))
       .map(t => ({
         ...t,
@@ -186,12 +181,10 @@ export default function SpeedDial() {
           ),
         })),
       }))
-  }, [storeTargets, activeListId, user, isRepMode])
+  }, [storeTargets, user])
   const [saving, setSaving]             = useState(false)
   const [unassigning, setUnassigning]   = useState(false)
   const [editingTarget, setEditingTarget] = useState<Target | null>(null)
-  const [showListDrop, setShowListDrop] = useState(false)
-
   // Outcome modal
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [outcomeSelection, setOutcomeSelection] = useState<OutcomeOption | null>(null)
@@ -241,31 +234,12 @@ export default function SpeedDial() {
   // Transcript (wired to Twilio when connected)
   const [transcript, setTranscript] = useState<Utterance[]>([])
 
-  const listDropRef    = useRef<HTMLDivElement>(null)
   const activeItemRef  = useRef<HTMLButtonElement | null>(null)
   const activePhoneRef   = useRef<HTMLDivElement | null>(null)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null)
   const deviceRef        = useRef<Device | null>(null)
   const activeCallRef    = useRef<Call | null>(null)
-
-  // Restore nav state list selection once lists are loaded
-  useEffect(() => {
-    if (navState.listId && lists.length > 0) setActiveListId(navState.listId)
-  }, [lists])
-
-  // Reset selection when list changes, then auto-select the first workable target
-  const prevListIdRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (prevListIdRef.current !== activeListId) {
-      prevListIdRef.current = activeListId
-      setActiveId(null)
-      setAutoDialing(false)
-      setSearch('')
-      setContactSearch('')
-      clearFilters()
-    }
-  }, [activeListId])
 
   useEffect(() => {
     setActiveId(prev => {
@@ -318,14 +292,6 @@ export default function SpeedDial() {
     return () => { device?.destroy() }
   }, [user, isRepMode, repTwilioIdentity])
 
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (listDropRef.current && !listDropRef.current.contains(e.target as Node))
-        setShowListDrop(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
 
 
   useEffect(() => {
@@ -351,7 +317,6 @@ export default function SpeedDial() {
   }, [callState])
 
   const activeTarget = targets.find(t => t.id === activeId) ?? null
-  const activeList   = lists.find(l => l.id === activeListId)
 
   // Fetch hail history when active target changes — depends on the resolved lat/lng
   useEffect(() => {
@@ -766,48 +731,7 @@ export default function SpeedDial() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: EASE }}
       >
-        <div className={styles.topLeft}>
-          <span className={styles.pageTitle}>TARGETS</span>
-
-          <div className={styles.listWrap} ref={listDropRef}>
-            <button className={styles.listTrigger} onClick={() => setShowListDrop(d => !d)}>
-              <span className={activeList ? styles.listVal : styles.listPlaceholder}>
-                {activeList ? activeList.name : 'All Targets'}
-              </span>
-              <span className={`${styles.chevron} ${showListDrop ? styles.chevronOpen : ''}`}>▾</span>
-            </button>
-            <AnimatePresence>
-              {showListDrop && (
-                <motion.div
-                  className={styles.listDrop}
-                  initial={{ opacity: 0, y: -6, scaleY: 0.92 }}
-                  animate={{ opacity: 1, y: 0, scaleY: 1 }}
-                  exit={{ opacity: 0, y: -4, scaleY: 0.94 }}
-                  transition={{ duration: 0.18, ease: EASE }}
-                  style={{ transformOrigin: 'top' }}
-                >
-                  <button
-                    className={`${styles.listOpt} ${!activeListId ? styles.listOptActive : ''}`}
-                    onClick={() => { setActiveListId(null); setShowListDrop(false) }}
-                  >
-                    {!activeListId && <span className={styles.listOptDot} />}
-                    All Targets
-                  </button>
-                  {lists.map(l => (
-                    <button
-                      key={l.id}
-                      className={`${styles.listOpt} ${l.id === activeListId ? styles.listOptActive : ''}`}
-                      onClick={() => { setActiveListId(l.id); setShowListDrop(false) }}
-                    >
-                      {l.id === activeListId && <span className={styles.listOptDot} />}
-                      {l.name}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
+        <span className={styles.pageTitle}>TARGETS</span>
 
        
 	<div className={styles.dailyTracker}>
