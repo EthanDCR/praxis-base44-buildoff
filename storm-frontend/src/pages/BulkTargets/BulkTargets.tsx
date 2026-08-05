@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { base44 } from '../../lib/base44'
 import { useUser } from '../../lib/user-context'
 import { useDataStore } from '../../lib/data-store'
 import { extractState, filterTargets } from '../../lib/target-filters'
+import { MultiSelect } from '../../components/MultiSelect/MultiSelect'
 import EditTargetModal from '../../components/EditTargetModal/EditTargetModal'
 import styles from './BulkTargets.module.css'
 
@@ -29,85 +30,6 @@ const STATUS_OPTIONS = [
 const STATUS_LABEL: Record<string, string> = Object.fromEntries(
   STATUS_OPTIONS.map(o => [o.value, o.label])
 )
-
-/* ── MultiSelect dropdown ──────────────────────────────────── */
-
-function MultiSelect({
-  options,
-  selected,
-  onChange,
-  placeholder,
-  openUp = false,
-}: {
-  options: { value: string; label: string }[]
-  selected: Set<string>
-  onChange: (next: Set<string>) => void
-  placeholder: string
-  openUp?: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [])
-
-  function toggle(value: string) {
-    const next = new Set(selected)
-    if (next.has(value)) next.delete(value)
-    else next.add(value)
-    onChange(next)
-  }
-
-  const selectedLabels = options.filter(o => selected.has(o.value)).map(o => o.label)
-  const displayText =
-    selectedLabels.length === 0
-      ? placeholder
-      : selectedLabels.length <= 2
-      ? selectedLabels.join(', ')
-      : `${selectedLabels.slice(0, 2).join(', ')} +${selectedLabels.length - 2}`
-
-  return (
-    <div ref={ref} className={styles.multiSelectWrap}>
-      <button
-        type="button"
-        className={`${styles.multiSelectTrigger} ${selected.size > 0 ? styles.multiSelectTriggerActive : ''}`}
-        onClick={() => setOpen(o => !o)}
-      >
-        <span className={styles.multiSelectLabel}>{displayText}</span>
-        <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{ flexShrink: 0 }}>
-          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-      {open && (
-        <div className={`${styles.multiSelectDropdown}${openUp ? ' ' + styles.multiSelectDropdownUp : ''}`}>
-          {options.map(o => (
-            <label key={o.value} className={styles.multiSelectOption}>
-              <input
-                type="checkbox"
-                className={styles.multiSelectCheckbox}
-                checked={selected.has(o.value)}
-                onChange={() => toggle(o.value)}
-              />
-              {o.label}
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 /* ── Main component ────────────────────────────────────────── */
 

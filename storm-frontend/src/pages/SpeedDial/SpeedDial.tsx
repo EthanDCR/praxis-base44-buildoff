@@ -5,6 +5,8 @@ import { Device, Call } from '@twilio/voice-sdk'
 import { base44 } from '../../lib/base44'
 import { useDataStore } from '../../lib/data-store'
 import { useUser } from '../../lib/user-context'
+import { filterTargets, extractState } from '../../lib/target-filters'
+import { MultiSelect } from '../../components/MultiSelect/MultiSelect'
 import EditTargetModal from '../../components/EditTargetModal/EditTargetModal'
 import styles from './SpeedDial.module.css'
 
@@ -140,6 +142,13 @@ export default function SpeedDial() {
   const [activeId, setActiveId]         = useState<string | null>(null)
   const [filter, setFilter]             = useState<Filter>('all')
   const [searchQuery, setSearchQuery]   = useState('')
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const [stateFilter, setStateFilter]         = useState<Set<string>>(new Set())
+  const [hasPhoneFilter, setHasPhoneFilter]   = useState<'all' | 'yes' | 'no'>('all')
+  const [hailSizeMin, setHailSizeMin]         = useState('')
+  const [hailSizeMax, setHailSizeMax]         = useState('')
+  const [hailDateFrom, setHailDateFrom]       = useState('')
+  const [hailDateTo, setHailDateTo]           = useState('')
 
   const isRepMode = !!user && user.role !== 'admin'
 
@@ -242,6 +251,7 @@ export default function SpeedDial() {
       setActiveId(null)
       setAutoDialing(false)
       setSearchQuery('')
+      clearFilters()
     }
   }, [activeListId])
 
@@ -375,8 +385,16 @@ export default function SpeedDial() {
         t.contacts?.some(c => c.name.toLowerCase().includes(q))
       )
     }
-    return list
-  }, [targets, filter, searchQuery])
+    return filterTargets(list, {
+      search: '', contactSearch: '',
+      statusFilter: new Set(), listFilter: null, repFilter: new Set(),
+      stateFilter, roofMaterialFilter: new Set(),
+      hasPhoneFilter, hasEmailFilter: 'all',
+      propertyTypeSearch: '',
+      sqftMin: '', sqftMax: '',
+      hailSizeMin, hailSizeMax, hailDateFrom, hailDateTo,
+    })
+  }, [targets, filter, searchQuery, stateFilter, hasPhoneFilter, hailSizeMin, hailSizeMax, hailDateFrom, hailDateTo])
 
   const stats = {
     total:          targets.length,
@@ -393,6 +411,30 @@ export default function SpeedDial() {
     { key: 'called',         label: 'Called',       countKey: 'called'         },
     { key: 'not_interested', label: 'Not Interested', countKey: 'not_interested' },
   ]
+
+  function clearFilters() {
+    setStateFilter(new Set())
+    setHasPhoneFilter('all')
+    setHailSizeMin('')
+    setHailSizeMax('')
+    setHailDateFrom('')
+    setHailDateTo('')
+  }
+
+  const stateOptions = useMemo(() => {
+    const s = new Set<string>()
+    targets.forEach(t => { const st = extractState(t.line2 ?? ''); if (st) s.add(st) })
+    return [...s].sort().map(v => ({ value: v, label: v }))
+  }, [targets])
+
+  const activeFilterCount = [
+    stateFilter.size > 0,
+    hasPhoneFilter !== 'all',
+    !!hailSizeMin,
+    !!hailSizeMax,
+    !!hailDateFrom,
+    !!hailDateTo,
+  ].filter(Boolean).length
 
   function findNext(fromId: string): Target | null {
     const idx  = targets.findIndex(t => t.id === fromId)
@@ -835,6 +877,56 @@ export default function SpeedDial() {
               <button className={styles.queueSearchClear} onClick={() => setSearchQuery('')}>✕</button>
             )}
           </div>
+          <div className={styles.queueFilterBar}>
+            <button
+              className={`${styles.queueFilterToggle} ${filterPanelOpen ? styles.queueFilterToggleActive : ''}`}
+              onClick={() => setFilterPanelOpen(f => !f)}
+            >
+              Filters
+              {activeFilterCount > 0 && (
+                <span className={styles.queueFilterBadge}>{activeFilterCount}</span>
+              )}
+              <span className={`${styles.filterChevron} ${filterPanelOpen ? styles.filterChevronOpen : ''}`}>▾</span>
+            </button>
+            {activeFilterCount > 0 && (
+              <button className={styles.queueFilterClear} onClick={clearFilters}>Clear</button>
+            )}
+          </div>
+
+          {filterPanelOpen && (
+            <div className={styles.queueFilterPanel}>
+              <div className={styles.queueFilterRow}>
+                <span className={styles.queueFilterLabel}>Hail Size</span>
+                <div className={styles.queueFilterRange}>
+                  <input className={styles.queueFilterRangeInput} type="number" placeholder="min" value={hailSizeMin} onChange={e => setHailSizeMin(e.target.value)} />
+                  <span className={styles.queueFilterRangeSep}>–</span>
+                  <input className={styles.queueFilterRangeInput} type="number" placeholder="max" value={hailSizeMax} onChange={e => setHailSizeMax(e.target.value)} />
+                </div>
+              </div>
+              <div className={styles.queueFilterRow}>
+                <span className={styles.queueFilterLabel}>Hail Date</span>
+                <div className={styles.queueFilterDateRow}>
+                  <input className={styles.queueFilterDateInput} type="date" value={hailDateFrom} onChange={e => setHailDateFrom(e.target.value)} />
+                  <input className={styles.queueFilterDateInput} type="date" value={hailDateTo} onChange={e => setHailDateTo(e.target.value)} />
+                </div>
+              </div>
+              <div className={styles.queueFilterRow}>
+                <span className={styles.queueFilterLabel}>Has Phone</span>
+                <select className={styles.queueFilterSelect} value={hasPhoneFilter} onChange={e => setHasPhoneFilter(e.target.value as 'all' | 'yes' | 'no')}>
+                  <option value="all">All</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+              {stateOptions.length > 0 && (
+                <div className={styles.queueFilterRow}>
+                  <span className={styles.queueFilterLabel}>State</span>
+                  <MultiSelect options={stateOptions} selected={stateFilter} onChange={setStateFilter} placeholder="All states" />
+                </div>
+              )}
+            </div>
+          )}
+
           <div className={styles.filterWrap} ref={filterDropRef}>
             <button
               className={styles.filterTrigger}

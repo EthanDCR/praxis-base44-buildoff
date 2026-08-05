@@ -326,6 +326,154 @@
 }
 .queueSearchClear:hover { color: var(--text-primary); }
 
+.queueFilterBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 0;
+  flex-shrink: 0;
+}
+
+.queueFilterToggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  text-align: left;
+}
+
+.queueFilterToggle:hover { background: rgba(255,255,255,0.07); color: var(--text-secondary); }
+.queueFilterToggleActive { background: rgba(255,255,255,0.07); color: var(--text-secondary); border-color: rgba(255,255,255,0.14); }
+
+.queueFilterBadge {
+  background: rgba(96,165,250,0.2);
+  color: #60a5fa;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+}
+
+.queueFilterClear {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.12s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.queueFilterClear:hover { color: var(--text-primary); }
+
+.queueFilterPanel {
+  padding: 8px 10px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  margin-bottom: 2px;
+}
+
+.queueFilterRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.queueFilterLabel {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.queueFilterRange {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.queueFilterRangeInput {
+  flex: 1;
+  padding: 5px 7px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  outline: none;
+  min-width: 0;
+  transition: border-color 0.12s;
+  color-scheme: dark;
+}
+
+.queueFilterRangeInput:focus { border-color: rgba(255,255,255,0.18); }
+.queueFilterRangeInput::placeholder { color: var(--text-muted); }
+
+.queueFilterRangeSep {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.queueFilterDateRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.queueFilterDateInput {
+  width: 100%;
+  padding: 5px 7px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.12s;
+  color-scheme: dark;
+}
+
+.queueFilterDateInput:focus { border-color: rgba(255,255,255,0.18); }
+
+.queueFilterSelect {
+  width: 100%;
+  padding: 5px 7px;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  color-scheme: dark;
+  transition: border-color 0.12s;
+}
+
+.queueFilterSelect:focus { border-color: rgba(255,255,255,0.18); }
+
 .filterWrap { padding: 6px 10px 0; flex-shrink: 0; position: relative; }
 
 .filterTrigger {
