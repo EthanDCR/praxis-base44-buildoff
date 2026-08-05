@@ -53,8 +53,15 @@ interface Target {
 
 interface Utterance { speaker: 'agent' | 'contact'; text: string; ts: number }
 
-type Filter = 'all' | 'new' | 'callback' | 'called' | 'not_interested'
-type CallState    = 'idle' | 'active'
+type CallState = 'idle' | 'active'
+
+const STATUS_OPTIONS = [
+  { value: 'new', label: 'New' },
+  { value: 'called', label: 'Called' },
+  { value: 'callback', label: 'Callback' },
+  { value: 'not_interested', label: 'Not Interested' },
+  { value: 'sold', label: 'Inspection Set' },
+]
 type OutcomeOption =
   | 'lead_set'
   | 'scheduled_callback'
@@ -140,15 +147,21 @@ export default function SpeedDial() {
   useEffect(() => { refresh() }, [])
   const [activeListId, setActiveListId] = useState<string | null>(null)
   const [activeId, setActiveId]         = useState<string | null>(null)
-  const [filter, setFilter]             = useState<Filter>('all')
-  const [searchQuery, setSearchQuery]   = useState('')
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
-  const [stateFilter, setStateFilter]         = useState<Set<string>>(new Set())
-  const [hasPhoneFilter, setHasPhoneFilter]   = useState<'all' | 'yes' | 'no'>('all')
-  const [hailSizeMin, setHailSizeMin]         = useState('')
-  const [hailSizeMax, setHailSizeMax]         = useState('')
-  const [hailDateFrom, setHailDateFrom]       = useState('')
-  const [hailDateTo, setHailDateTo]           = useState('')
+  const [search, setSearch]             = useState('')
+  const [contactSearch, setContactSearch] = useState('')
+  const [filtersOpen, setFiltersOpen]   = useState(false)
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set())
+  const [stateFilter, setStateFilter]   = useState<Set<string>>(new Set())
+  const [roofMaterialFilter, setRoofMaterialFilter] = useState<Set<string>>(new Set())
+  const [hasPhoneFilter, setHasPhoneFilter] = useState<'all' | 'yes' | 'no'>('all')
+  const [hasEmailFilter, setHasEmailFilter] = useState<'all' | 'yes' | 'no'>('all')
+  const [propertyTypeSearch, setPropertyTypeSearch] = useState('')
+  const [sqftMin, setSqftMin]           = useState('')
+  const [sqftMax, setSqftMax]           = useState('')
+  const [hailSizeMin, setHailSizeMin]   = useState('')
+  const [hailSizeMax, setHailSizeMax]   = useState('')
+  const [hailDateFrom, setHailDateFrom] = useState('')
+  const [hailDateTo, setHailDateTo]     = useState('')
 
   const isRepMode = !!user && user.role !== 'admin'
 
@@ -177,8 +190,7 @@ export default function SpeedDial() {
   const [saving, setSaving]             = useState(false)
   const [unassigning, setUnassigning]   = useState(false)
   const [editingTarget, setEditingTarget] = useState<Target | null>(null)
-  const [showListDrop, setShowListDrop]     = useState(false)
-  const [showFilterDrop, setShowFilterDrop] = useState(false)
+  const [showListDrop, setShowListDrop] = useState(false)
 
   // Outcome modal
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
@@ -229,9 +241,8 @@ export default function SpeedDial() {
   // Transcript (wired to Twilio when connected)
   const [transcript, setTranscript] = useState<Utterance[]>([])
 
-  const listDropRef      = useRef<HTMLDivElement>(null)
-  const filterDropRef    = useRef<HTMLDivElement>(null)
-  const activeItemRef    = useRef<HTMLButtonElement | null>(null)
+  const listDropRef    = useRef<HTMLDivElement>(null)
+  const activeItemRef  = useRef<HTMLButtonElement | null>(null)
   const activePhoneRef   = useRef<HTMLDivElement | null>(null)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -250,7 +261,8 @@ export default function SpeedDial() {
       prevListIdRef.current = activeListId
       setActiveId(null)
       setAutoDialing(false)
-      setSearchQuery('')
+      setSearch('')
+      setContactSearch('')
       clearFilters()
     }
   }, [activeListId])
@@ -310,8 +322,6 @@ export default function SpeedDial() {
     function handler(e: MouseEvent) {
       if (listDropRef.current && !listDropRef.current.contains(e.target as Node))
         setShowListDrop(false)
-      if (filterDropRef.current && !filterDropRef.current.contains(e.target as Node))
-        setShowFilterDrop(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -375,50 +385,37 @@ export default function SpeedDial() {
     setNotesDraft(activeTarget?.notes ?? '')
   }, [activeId])
 
-  const visibleTargets = useMemo(() => {
-    let list = filter === 'all' ? targets : targets.filter(t => t.status === filter)
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase()
-      list = list.filter(t =>
-        t.line1.toLowerCase().includes(q) ||
-        (t.line2 ?? '').toLowerCase().includes(q) ||
-        t.contacts?.some(c => c.name.toLowerCase().includes(q))
-      )
-    }
-    return filterTargets(list, {
-      search: '', contactSearch: '',
-      statusFilter: new Set(), listFilter: null, repFilter: new Set(),
-      stateFilter, roofMaterialFilter: new Set(),
-      hasPhoneFilter, hasEmailFilter: 'all',
-      propertyTypeSearch: '',
-      sqftMin: '', sqftMax: '',
-      hailSizeMin, hailSizeMax, hailDateFrom, hailDateTo,
-    })
-  }, [targets, filter, searchQuery, stateFilter, hasPhoneFilter, hailSizeMin, hailSizeMax, hailDateFrom, hailDateTo])
+  const visibleTargets = useMemo(() => filterTargets(targets, {
+    search, contactSearch,
+    statusFilter, listFilter: null, repFilter: new Set(),
+    stateFilter, roofMaterialFilter,
+    hasPhoneFilter, hasEmailFilter,
+    propertyTypeSearch,
+    sqftMin, sqftMax,
+    hailSizeMin, hailSizeMax, hailDateFrom, hailDateTo,
+  }), [targets, search, contactSearch, statusFilter, stateFilter, roofMaterialFilter,
+       hasPhoneFilter, hasEmailFilter, propertyTypeSearch, sqftMin, sqftMax,
+       hailSizeMin, hailSizeMax, hailDateFrom, hailDateTo])
 
   const stats = {
-    total:          targets.length,
     new:            targets.filter(t => t.status === 'new').length,
     callback:       targets.filter(t => t.status === 'callback').length,
     called:         targets.filter(t => t.status === 'called').length,
     not_interested: targets.filter(t => t.status === 'not_interested').length,
   }
 
-  const FILTERS: { key: Filter; label: string; countKey?: keyof typeof stats }[] = [
-    { key: 'all',            label: 'All',          countKey: 'total'          },
-    { key: 'new',            label: 'New',          countKey: 'new'            },
-    { key: 'callback',       label: 'Callback',     countKey: 'callback'       },
-    { key: 'called',         label: 'Called',       countKey: 'called'         },
-    { key: 'not_interested', label: 'Not Interested', countKey: 'not_interested' },
-  ]
+  const hasActiveFilters =
+    !!search || !!contactSearch ||
+    statusFilter.size > 0 || stateFilter.size > 0 || roofMaterialFilter.size > 0 ||
+    hasPhoneFilter !== 'all' || hasEmailFilter !== 'all' || !!propertyTypeSearch ||
+    !!sqftMin || !!sqftMax || !!hailSizeMin || !!hailSizeMax || !!hailDateFrom || !!hailDateTo
 
   function clearFilters() {
-    setStateFilter(new Set())
-    setHasPhoneFilter('all')
-    setHailSizeMin('')
-    setHailSizeMax('')
-    setHailDateFrom('')
-    setHailDateTo('')
+    setSearch(''); setContactSearch('')
+    setStatusFilter(new Set()); setStateFilter(new Set()); setRoofMaterialFilter(new Set())
+    setHasPhoneFilter('all'); setHasEmailFilter('all'); setPropertyTypeSearch('')
+    setSqftMin(''); setSqftMax('')
+    setHailSizeMin(''); setHailSizeMax(''); setHailDateFrom(''); setHailDateTo('')
   }
 
   const stateOptions = useMemo(() => {
@@ -427,14 +424,11 @@ export default function SpeedDial() {
     return [...s].sort().map(v => ({ value: v, label: v }))
   }, [targets])
 
-  const activeFilterCount = [
-    stateFilter.size > 0,
-    hasPhoneFilter !== 'all',
-    !!hailSizeMin,
-    !!hailSizeMax,
-    !!hailDateFrom,
-    !!hailDateTo,
-  ].filter(Boolean).length
+  const roofMaterialOptions = useMemo(() => {
+    const s = new Set<string>()
+    targets.forEach(t => { if (t.roof_material) s.add(t.roof_material) })
+    return [...s].sort().map(v => ({ value: v, label: v }))
+  }, [targets])
 
   function findNext(fromId: string): Target | null {
     const idx  = targets.findIndex(t => t.id === fromId)
@@ -841,6 +835,116 @@ export default function SpeedDial() {
         )}
       </motion.div>
 
+      {/* ── Search + filter area ───────────────────────────────────── */}
+      <motion.div
+        className={styles.searchArea}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.08, duration: 0.4 }}
+      >
+        <div className={styles.searchRow}>
+          <input
+            className={styles.searchInput}
+            placeholder="Address, city, state, zip, business…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <div className={styles.searchRow}>
+          <input
+            className={styles.searchInput}
+            placeholder="Contact name or phone…"
+            value={contactSearch}
+            onChange={e => setContactSearch(e.target.value)}
+          />
+        </div>
+        <div className={styles.filterToggleRow}>
+          <button
+            className={`${styles.filtersToggleBtn} ${filtersOpen ? styles.filtersToggleBtnActive : ''}`}
+            onClick={() => setFiltersOpen(o => !o)}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M1 2.5h11M3 6.5h7M5 10.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            Filters
+            {hasActiveFilters && <span className={styles.filterActiveDot} />}
+          </button>
+          {hasActiveFilters && (
+            <button className={styles.clearFiltersBtn} onClick={clearFilters}>Clear all</button>
+          )}
+        </div>
+        <AnimatePresence>
+          {filtersOpen && (
+            <motion.div
+              className={styles.filterPanel}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: EASE }}
+            >
+              <div className={styles.filterGrid}>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>STATUS</label>
+                  <MultiSelect options={STATUS_OPTIONS} selected={statusFilter} onChange={setStatusFilter} placeholder="All Statuses" />
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>STATE</label>
+                  <MultiSelect options={stateOptions} selected={stateFilter} onChange={setStateFilter} placeholder="All States" />
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>ROOF MATERIAL</label>
+                  <MultiSelect options={roofMaterialOptions} selected={roofMaterialFilter} onChange={setRoofMaterialFilter} placeholder="All Materials" />
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>HAS PHONE</label>
+                  <select className={styles.filterSelect} value={hasPhoneFilter} onChange={e => setHasPhoneFilter(e.target.value as 'all' | 'yes' | 'no')}>
+                    <option value="all">All</option>
+                    <option value="yes">Has Phone</option>
+                    <option value="no">No Phone</option>
+                  </select>
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>HAS EMAIL</label>
+                  <select className={styles.filterSelect} value={hasEmailFilter} onChange={e => setHasEmailFilter(e.target.value as 'all' | 'yes' | 'no')}>
+                    <option value="all">All</option>
+                    <option value="yes">Has Email</option>
+                    <option value="no">No Email</option>
+                  </select>
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>PROPERTY TYPE</label>
+                  <input className={styles.filterInput} placeholder="e.g. Retail, Industrial…" value={propertyTypeSearch} onChange={e => setPropertyTypeSearch(e.target.value)} />
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>SQFT MIN</label>
+                  <input className={styles.filterInput} type="number" placeholder="Min" value={sqftMin} onChange={e => setSqftMin(e.target.value)} />
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>SQFT MAX</label>
+                  <input className={styles.filterInput} type="number" placeholder="Max" value={sqftMax} onChange={e => setSqftMax(e.target.value)} />
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>HAIL SIZE MIN (in)</label>
+                  <input className={styles.filterInput} type="number" step="0.25" placeholder="Min" value={hailSizeMin} onChange={e => setHailSizeMin(e.target.value)} />
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>HAIL SIZE MAX (in)</label>
+                  <input className={styles.filterInput} type="number" step="0.25" placeholder="Max" value={hailSizeMax} onChange={e => setHailSizeMax(e.target.value)} />
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>HAIL DATE FROM</label>
+                  <input className={styles.filterInput} type="date" value={hailDateFrom} onChange={e => setHailDateFrom(e.target.value)} />
+                </div>
+                <div className={styles.filterCell}>
+                  <label className={styles.filterLabel}>HAIL DATE TO</label>
+                  <input className={styles.filterInput} type="date" value={hailDateTo} onChange={e => setHailDateTo(e.target.value)} />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
       {/* ── Body ────────────────────────────────────────────────────── */}
       <div className={styles.body}>
 
@@ -851,7 +955,7 @@ export default function SpeedDial() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1, duration: 0.6, ease: EASE }}
         >
-          {isRepMode && !loadingTargets && (
+          {!loadingTargets && (
             <div className={styles.repQueue}>
               {stats.callback > 0 && (
                 <span className={styles.repQueueCallback}>
@@ -865,110 +969,11 @@ export default function SpeedDial() {
               <span className={styles.repQueueTotal}>{targets.length} total</span>
             </div>
           )}
-          <div className={styles.queueSearch}>
-            <input
-              className={styles.queueSearchInput}
-              type="text"
-              placeholder="Search address or name…"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button className={styles.queueSearchClear} onClick={() => setSearchQuery('')}>✕</button>
-            )}
-          </div>
-          <div className={styles.queueFilterBar}>
-            <button
-              className={`${styles.queueFilterToggle} ${filterPanelOpen ? styles.queueFilterToggleActive : ''}`}
-              onClick={() => setFilterPanelOpen(f => !f)}
-            >
-              Filters
-              {activeFilterCount > 0 && (
-                <span className={styles.queueFilterBadge}>{activeFilterCount}</span>
-              )}
-              <span className={`${styles.filterChevron} ${filterPanelOpen ? styles.filterChevronOpen : ''}`}>▾</span>
-            </button>
-            {activeFilterCount > 0 && (
-              <button className={styles.queueFilterClear} onClick={clearFilters}>Clear</button>
-            )}
-          </div>
-
-          {filterPanelOpen && (
-            <div className={styles.queueFilterPanel}>
-              <div className={styles.queueFilterRow}>
-                <span className={styles.queueFilterLabel}>Hail Size</span>
-                <div className={styles.queueFilterRange}>
-                  <input className={styles.queueFilterRangeInput} type="number" placeholder="min" value={hailSizeMin} onChange={e => setHailSizeMin(e.target.value)} />
-                  <span className={styles.queueFilterRangeSep}>–</span>
-                  <input className={styles.queueFilterRangeInput} type="number" placeholder="max" value={hailSizeMax} onChange={e => setHailSizeMax(e.target.value)} />
-                </div>
-              </div>
-              <div className={styles.queueFilterRow}>
-                <span className={styles.queueFilterLabel}>Hail Date</span>
-                <div className={styles.queueFilterDateRow}>
-                  <input className={styles.queueFilterDateInput} type="date" value={hailDateFrom} onChange={e => setHailDateFrom(e.target.value)} />
-                  <input className={styles.queueFilterDateInput} type="date" value={hailDateTo} onChange={e => setHailDateTo(e.target.value)} />
-                </div>
-              </div>
-              <div className={styles.queueFilterRow}>
-                <span className={styles.queueFilterLabel}>Has Phone</span>
-                <select className={styles.queueFilterSelect} value={hasPhoneFilter} onChange={e => setHasPhoneFilter(e.target.value as 'all' | 'yes' | 'no')}>
-                  <option value="all">All</option>
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
-              </div>
-              {stateOptions.length > 0 && (
-                <div className={styles.queueFilterRow}>
-                  <span className={styles.queueFilterLabel}>State</span>
-                  <MultiSelect options={stateOptions} selected={stateFilter} onChange={setStateFilter} placeholder="All states" />
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className={styles.filterWrap} ref={filterDropRef}>
-            <button
-              className={styles.filterTrigger}
-              onClick={() => setShowFilterDrop(d => !d)}
-            >
-              <span className={styles.filterTriggerLabel}>
-                {FILTERS.find(f => f.key === filter)?.label ?? 'All'}
-              </span>
-              {(() => { const f = FILTERS.find(f => f.key === filter); return f?.countKey && stats[f.countKey] > 0 ? <span className={styles.filterTriggerCount}>{stats[f.countKey]}</span> : null })()}
-              <span className={`${styles.filterChevron} ${showFilterDrop ? styles.filterChevronOpen : ''}`}>▾</span>
-            </button>
-            <AnimatePresence>
-              {showFilterDrop && (
-                <motion.div
-                  className={styles.filterDrop}
-                  initial={{ opacity: 0, y: -6, scaleY: 0.92 }}
-                  animate={{ opacity: 1, y: 0, scaleY: 1 }}
-                  exit={{ opacity: 0, y: -4, scaleY: 0.94 }}
-                  transition={{ duration: 0.15, ease: EASE }}
-                  style={{ transformOrigin: 'top' }}
-                >
-                  {FILTERS.map(({ key, label, countKey }) => (
-                    <button
-                      key={key}
-                      className={`${styles.filterOpt} ${filter === key ? styles.filterOptActive : ''}`}
-                      onClick={() => { setFilter(key); setShowFilterDrop(false) }}
-                    >
-                      <span className={styles.filterOptLabel}>{label}</span>
-                      {countKey && stats[countKey] > 0 && (
-                        <span className={styles.filterOptCount}>{stats[countKey]}</span>
-                      )}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
           <div className={styles.queueList}>
             {loadingTargets && <div className={styles.queueEmpty}>Loading…</div>}
             {!loadingTargets && visibleTargets.length === 0 && (
               <div className={styles.queueEmpty}>
-                {searchQuery.trim() ? 'No matches' : 'No targets in this filter'}
+                {hasActiveFilters ? 'No matches' : 'No targets'}
               </div>
             )}
             {!loadingTargets && visibleTargets.map(t => (
