@@ -194,9 +194,9 @@ export default function SpeedDial() {
 
   useEffect(() => {
     if (!user?.email) return
-    base44.entities.UserProfile.filter({ email: user.email }, undefined, 1)
+    base44.entities.UserProfile.filter({ email: user.email }, undefined, 20)
       .then((d: any) => {
-        const p = d[0]
+        const p = (d as any[]).find((x: any) => x.email?.toLowerCase() === user.email!.toLowerCase())
         if (p?.twilio_identity) setRepTwilioIdentity(p.twilio_identity)
         if (p?.twilio_number)   setRepTwilioNumber(p.twilio_number)
       })
