@@ -139,6 +139,7 @@ export default function SpeedDial() {
   const [activeListId, setActiveListId] = useState<string | null>(null)
   const [activeId, setActiveId]         = useState<string | null>(null)
   const [filter, setFilter]             = useState<Filter>('all')
+  const [searchQuery, setSearchQuery]   = useState('')
 
   const isRepMode = !!user && user.role !== 'admin'
 
@@ -240,6 +241,7 @@ export default function SpeedDial() {
       prevListIdRef.current = activeListId
       setActiveId(null)
       setAutoDialing(false)
+      setSearchQuery('')
     }
   }, [activeListId])
 
@@ -363,7 +365,18 @@ export default function SpeedDial() {
     setNotesDraft(activeTarget?.notes ?? '')
   }, [activeId])
 
-  const visibleTargets = filter === 'all' ? targets : targets.filter(t => t.status === filter)
+  const visibleTargets = useMemo(() => {
+    let list = filter === 'all' ? targets : targets.filter(t => t.status === filter)
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      list = list.filter(t =>
+        t.line1.toLowerCase().includes(q) ||
+        (t.line2 ?? '').toLowerCase().includes(q) ||
+        t.contacts?.some(c => c.name.toLowerCase().includes(q))
+      )
+    }
+    return list
+  }, [targets, filter, searchQuery])
 
   const stats = {
     total:          targets.length,
@@ -810,6 +823,18 @@ export default function SpeedDial() {
               <span className={styles.repQueueTotal}>{targets.length} total</span>
             </div>
           )}
+          <div className={styles.queueSearch}>
+            <input
+              className={styles.queueSearchInput}
+              type="text"
+              placeholder="Search address or name…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className={styles.queueSearchClear} onClick={() => setSearchQuery('')}>✕</button>
+            )}
+          </div>
           <div className={styles.filterWrap} ref={filterDropRef}>
             <button
               className={styles.filterTrigger}
@@ -850,7 +875,9 @@ export default function SpeedDial() {
           <div className={styles.queueList}>
             {loadingTargets && <div className={styles.queueEmpty}>Loading…</div>}
             {!loadingTargets && visibleTargets.length === 0 && (
-              <div className={styles.queueEmpty}>No targets in this filter</div>
+              <div className={styles.queueEmpty}>
+                {searchQuery.trim() ? 'No matches' : 'No targets in this filter'}
+              </div>
             )}
             {!loadingTargets && visibleTargets.map(t => (
               <button
