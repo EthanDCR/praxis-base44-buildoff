@@ -2,17 +2,21 @@
   "name": "Target",
   "type": "object",
   "properties": {
-    "list_id": {
-      "type": "string",
-      "description": "ID of the CallList this target belongs to"
-    },
-    "line1": {
+    "street": {
       "type": "string",
       "description": "Street address"
     },
-    "line2": {
+    "city": {
       "type": "string",
-      "description": "City, State ZIP"
+      "description": "City"
+    },
+    "state": {
+      "type": "string",
+      "description": "State abbreviation"
+    },
+    "zip": {
+      "type": "string",
+      "description": "ZIP code"
     },
     "lat": {
       "type": "number",
@@ -22,120 +26,106 @@
       "type": "number",
       "description": "Longitude"
     },
-    "hail_size": {
-      "type": "number",
-      "description": "Hail size in inches at this location"
-    },
-    "hail_date": {
+    "business_name": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date of the hail event"
+      "description": "Business or site name"
     },
-    "additional_storm_dates": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Additional storm event dates at this location"
+    "building_type": {
+      "type": "string",
+      "description": "Building type (e.g. Office, Warehouse, Retail)"
     },
     "property_type": {
       "type": "string",
-      "description": "Property type from Reonomy (e.g. Retail, Industrial, Multifamily)"
-    },
-    "property_subtype": {
-      "type": "string",
-      "description": "Property subtype from Reonomy"
+      "description": "Property type (e.g. Retail, Industrial, Multifamily)"
     },
     "year_built": {
       "type": "string",
       "description": "Year the building was constructed"
     },
-    "dm_property_id": {
+    "roof_type": {
       "type": "string",
-      "description": "DealMachine property ID for this address"
+      "description": "Roof type / cover material"
     },
-    "square_footage": {
+    "roof_size_sq": {
       "type": "number",
-      "description": "Building square footage from DealMachine"
+      "description": "Roof size in squares"
     },
-    "roof_age": {
+    "building_sqft": {
       "type": "number",
-      "description": "Roof age in years from DealMachine"
+      "description": "Building square footage"
     },
-    "roof_material": {
+    "stories": {
+      "type": "number",
+      "description": "Number of stories"
+    },
+    "hail_score_tier": {
       "type": "string",
-      "description": "Roof material from DealMachine"
+      "enum": ["Severe", "High", "Moderate", "Low"],
+      "description": "Hail risk score tier"
     },
-    "estimated_value": {
+    "hail_score_value": {
       "type": "number",
-      "description": "Estimated property value from DealMachine"
+      "description": "Numeric hail risk score (0-100)"
     },
-    "equity_percent": {
+    "largest_hail_inches": {
       "type": "number",
-      "description": "Owner equity percentage from DealMachine"
+      "description": "Largest recorded hail size in inches"
     },
-    "contacts": {
+    "largest_hail_date": {
+      "type": "string",
+      "description": "Date of the largest hail event (YYYY-MM-DD)"
+    },
+    "most_recent_event_date": {
+      "type": "string",
+      "description": "Most recent hail event date (YYYY-MM-DD)"
+    },
+    "total_events_10yr": {
+      "type": "number",
+      "description": "Total hail events in the last 10 years"
+    },
+    "hail_history": {
       "type": "array",
-      "description": "Owner/contact records from DealMachine",
+      "description": "Hail event history, newest first",
       "items": {
         "type": "object",
         "properties": {
-          "name":    { "type": "string" },
-          "company": { "type": "string" },
-          "title":   { "type": "string" },
-          "phones": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "number": { "type": "string" },
-                "type":   { "type": "string" }
-              }
-            }
-          },
-          "emails":  { "type": "array", "items": { "type": "string" } }
+          "date": { "type": "string" },
+          "size": { "type": "number" }
         }
       }
     },
+    "data_sources": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Which data sources this address appeared in (e.g. DealMachine, BatchData, SalesMastery)"
+    },
+    "pipeline": {
+      "type": "string",
+      "enum": ["unassigned", "rep_queue", "overwatch", "commercial"],
+      "default": "unassigned",
+      "description": "Which workflow bucket this target lives in"
+    },
     "status": {
       "type": "string",
-      "enum": ["new", "called", "callback", "not_interested", "sold", "overwatch", "crm_sent"],
+      "enum": ["new", "called", "callback", "not_interested", "sold", "crm_sent"],
       "default": "new",
-      "description": "Current status of this target"
-    },
-    "phone_qualities": {
-      "type": "object",
-      "description": "Per-phone quality ratings keyed by contactIdx_phoneIdx"
-    },
-    "damage_signal": {
-      "type": "string",
-      "enum": ["yes", "no"],
-      "description": "Damage detected by inspection API — yes or no"
-    },
-    "notes": {
-      "type": "string",
-      "description": "Notes from the call"
+      "description": "Outreach progress within the pipeline"
     },
     "assigned_to": {
       "type": "string",
       "description": "Email of the rep this target is assigned to"
     },
-    "hail_history": {
-      "type": "array",
-      "description": "Full hail event history from IHM (5 years), newest first",
-      "items": {
-        "type": "object",
-        "properties": {
-          "date": { "type": "string", "description": "ISO date YYYY-MM-DD" },
-          "size": { "type": "number", "description": "Max hail size in inches" }
-        }
-      }
-    },
-    "hail_history_fetched_at": {
+    "damage_signal": {
       "type": "string",
-      "format": "date-time",
-      "description": "When hail_history was last populated — skips already-fetched targets on re-run"
+      "enum": ["yes", "no"],
+      "description": "Damage detected by inspection API"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes from calls or visits"
     }
   },
-  "required": ["list_id", "line1"],
+  "required": ["street"],
   "rls": {
     "create": true,
     "read": true,

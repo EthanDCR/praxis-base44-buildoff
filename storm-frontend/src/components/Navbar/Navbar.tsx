@@ -51,6 +51,7 @@ export default function Navbar() {
           ...(user?.role === 'admin'
             ? [{ to: '/bulk-targets', label: 'Bulk Targets' }]
             : []),
+          { to: '/commercial-pipeline', label: 'Commercial' },
         ].map(({ to, label }) => (
           <li key={to}>
             <NavLink

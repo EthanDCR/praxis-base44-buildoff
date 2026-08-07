@@ -49,3 +49,14 @@ hail-pipeline/data/raw/*.grib2.gz
 script.js
 attom_response.json
 haillix-scraper/
+hail-pipeline/stormpull_batch.py
+hail-pipeline/batchdata_skiptrace.py
+
+# Raw address / skip trace data (PII, large files)
+Batch Data Property Addresses -SM.txt
+testCsvs/*.csv
+testCsvs/*.json
+testCsvs/skiptrace.py
+finishedCsvs/*.csv
+finishedCsvs/*.xlsx
+storm-frontend/*.png

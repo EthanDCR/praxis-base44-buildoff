@@ -1,0 +1,47 @@
+{
+  "name": "Contact",
+  "type": "object",
+  "properties": {
+    "target_id": {
+      "type": "string",
+      "description": "ID of the Target this contact belongs to"
+    },
+    "contact_name": {
+      "type": "string",
+      "description": "Name of the person associated with this phone/email"
+    },
+    "value": {
+      "type": "string",
+      "description": "The phone number or email address"
+    },
+    "contact_type": {
+      "type": "string",
+      "enum": ["phone", "email"],
+      "description": "Whether this is a phone number or email address"
+    },
+    "phone_type": {
+      "type": "string",
+      "description": "Phone line type (Mobile, Landline, VoIP, etc.)"
+    },
+    "tcpa": {
+      "type": "boolean",
+      "description": "Whether this number has TCPA restrictions"
+    },
+    "score": {
+      "type": "integer",
+      "description": "How many data sources this value appeared in — higher is more reliable"
+    },
+    "sources": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Which data sources this value came from (e.g. DealMachine, BatchData, SalesMastery)"
+    },
+  },
+  "required": ["target_id", "value", "contact_type"],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}

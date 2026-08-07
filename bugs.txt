@@ -1,20 +1,50 @@
 
--- bulk assign button where he can select multiple reps and then assign them to multiple reps evenly (today)
+-- bulk assign button where he can select multiple reps and then assign them to multiple reps evenly (today) (done)
 
--- delete target button (today)
+-- call routing correctly (done  (need to test))
 
--- unassign targets 
+-- unassign targets (done)
 
--- after adding owner to target card (making an edit to target card, twilio no longer connected)
+-- less small targets (just add filter) (done) 
 
--- call routing correctly 
+-- sharing targets when it should only be assinged to one person (done)
 
--- less small targets (just add filter) 
+-- unassign button instead of delete button so they can get small targets off their list (done)
 
--- unassign button instead of delete button so they can get small targets off their list
+-- filters and search bar on targets page (done)
+
+
+
+-- after adding owner to target card twilio not connected?
 
 -- refreshed page and now all targets that have already been called aren't 
 
--- sharing targets when it should only be assinged to one person
+why were targets being shown to everyone? 
+we dont have base44 as auth, we cant because we cant use their ui because the map doesnt work, and base44 wount allow me to use their auth and re direct users to a non base44 hosted site. this means users arent actually verified on there but our database is base44 so when users hit the api to the database, they arent actually verified as a user, I had to disable rls so that it would still return data, but base44 would just return every data point and now allow it how we wanted so i had to handle the sorting on the frontend, this uses more browser ram and is not the right way to do this but that should be working now. I'm ggoing to make a large deploy once everyone is done working for the day with all the updates.
 
--- remove targets from list
+
+Backend (storm-backend) — 2 changes:
+- target.jsonc — added hail_history and hail_history_fetched_at fields for when IHM credentials get fixed and you run the hail backfill script
+- dm-enrich/entry.ts — added lat/lng to the DM enrichment response
+
+Frontend — the meaningful changes:
+- App.tsx — removed dev login bypass so local testing works with real accounts
+- Login.tsx — fallback login for unverified Base44 accounts (the reps)
+- data-store.tsx — reps now load all targets and filter client-side (fixes the "reps see all targets" bug)
+
+- BulkTargets — multi-rep select, targets split evenly across selected reps
+
+- SpeedDial — Unassign button, everyone's targets page now filters by their own assigned_to
+
+Backend schema change is not urgent (hail history isn't running yet), but we should push it anyway so Base44's schema stays in sync.
+
+
+shows how many times you've called a number
+
+
+- Test 
+
+When each rep opens the app, their browser has to "register" with Twilio as a named device — like a name tag. Right now the app tries to fetch that name from the database, but because reps aren't actually logged in with real auth tokens, the database ignores the filter and returns whoever's first in the table. So every rep's browser registers with the same name tag.
+
+how many tines the number appears from each different data source 
+to score and sort the numbers display order

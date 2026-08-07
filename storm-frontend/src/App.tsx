@@ -10,6 +10,7 @@ import Leads from './pages/Leads/Leads'
 import Overwatch from './pages/Overwatch/Overwatch'
 import Admin from './pages/Admin/Admin'
 import BulkTargets from './pages/BulkTargets/BulkTargets'
+import CommercialPipeline from './pages/CommercialPipeline/CommercialPipeline'
 import Login from './pages/Login/Login'
 import { base44 } from './lib/base44'
 import { UserProvider, type AppUser } from './lib/user-context'
@@ -110,6 +111,7 @@ export default function App() {
                   <Route path="/overwatch" element={<Overwatch />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/bulk-targets" element={<BulkTargets />} />
+                  <Route path="/commercial-pipeline" element={<CommercialPipeline />} />
                 </Routes>
               </BrowserRouter>
             </motion.div>

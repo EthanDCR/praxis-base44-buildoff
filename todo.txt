@@ -48,3 +48,12 @@ sometimes it just jumps around cards, doesnt always go to the next number down i
 The root cause was missing worker files in the production build. Maplibre-gl v6 uses ES module workers — the main bundle at /assets/index.js tries to load /assets/maplibre-gl-worker.mjs and /assets/maplibre-gl-shared.mjs at runtime. Vite doesn't automatically copy those files to dist/ when bundling, so on any live server they'd 404. Since our vercel.json has a catch-all SPA rewrite, those 404s returned index.html with a text/html MIME type, which browsers reject for module scripts. Worker never loads → GeoJSON can't be processed → nothing renders. Raster tiles worked fine because they don't need the worker.
 
 Fix was just copying the maplibre-gl dist files into dist/assets/ alongside the bundle.
+
+create new adress list 
+only for okla and texas 
+filter everything under 100 squares 
+skip trace every adress
+get square foo
+
+
+living area on dm can be sqft but it shouldnt bypass sales mastery data if salesmastery has data always show that as sqft
